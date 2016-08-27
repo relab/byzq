@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package byzq;
+
+// Byzantine Safe Register, ref. Algo. 4.14 in RSDP.
+// Requires authenticated channels
+// RequestID field of messages not needed since gRPC handles request matching.
+
+service Register {
+	rpc Read(Empty) returns (State) {}
+	rpc Write(State) returns (WriteResponse) {}
+}
+
+// [Read, requestID]
+message Empty {
+}
+
+// [Value, requestID, ts, val]
+//message ReadResponse {
+//	int64 timestamp = 1;
+//	int64 value	= 2;
+//}
+
+// [Write, wts, val]
+message State {
+	int64 value	= 1;
+	int64 timestamp = 2;
+} 
+
+// [Ack, ts]
+message WriteResponse {
+	int64 timestamp = 1;
+	bool written	= 2;
+}
+
