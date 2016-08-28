@@ -5,7 +5,7 @@ import "github.com/relab/byzq/proto/byzq"
 // defaultVal is returned by the register when no quorum is reached.
 // It is considered safe to return this value, rather than returning
 // a reply that does not constitute a quorum.
-var defaultVal = &byzq.State{Value: -1, Timestamp: -1}
+var defaultVal = byzq.State{Value: -1, Timestamp: -1}
 
 // ByzQ todo(doc) does something useful?
 type ByzQ struct {
@@ -17,6 +17,9 @@ type ByzQ struct {
 
 // NewByzQ returns a Byzantine masking quorum specification.
 func NewByzQ(n, f int) *ByzQ {
+	if n <= 4 {
+		return nil
+	}
 	//todo(meling) should return error if n too low to satisfy f.
 	return &ByzQ{0, n, f, (n + 2*f) / 2}
 }
@@ -26,6 +29,7 @@ func NewByzQ(n, f int) *ByzQ {
 // method returns a single state and true.
 func (bq *ByzQ) ReadQF(replies []*byzq.State) (*byzq.State, bool) {
 	if len(replies) <= bq.q {
+		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
 		return nil, false
 	}
 	// filter out highest val that appears at least f times
@@ -37,12 +41,12 @@ func (bq *ByzQ) ReadQF(replies []*byzq.State) (*byzq.State, bool) {
 	for reply, count := range same {
 		// select reply with highest timestamp if it has more than f replies
 		if count > bq.f && reply.Timestamp > highest.Timestamp {
-			highest = &reply
+			highest = reply
 		}
 	}
 	// returns the reply with the highest timestamp, or if no quorum for
 	// the same timestamp-value pair has been found, the defaultVal is returned.
-	return highest, true
+	return &highest, true
 }
 
 // WriteQF returns nil and false until the supplied replies
