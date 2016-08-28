@@ -49,12 +49,10 @@ func (r *register) Read(ctx context.Context, e *byzq.Empty) (*byzq.State, error)
 }
 
 func (r *register) Write(ctx context.Context, s *byzq.State) (*byzq.WriteResponse, error) {
-	wr := &byzq.WriteResponse{}
+	wr := &byzq.WriteResponse{Timestamp: s.Timestamp}
 	r.Lock()
 	if s.Timestamp > r.state.Timestamp {
 		r.state = *s
-		wr.Timestamp = s.Timestamp
-		wr.Written = true
 	}
 	r.Unlock()
 	return wr, nil

@@ -51,6 +51,7 @@ func main() {
 	}
 
 	byzQSpec.wts++ //todo(meling) encapsulate this in a constructor, state/msg generator, or something
+	// todo(meling) this wts is only suitable for single writer registers; multiple writers could perhaps be supported if wts was a combination of pid and wts?
 	ack, err := conf.Write(&byzq.State{Timestamp: byzQSpec.wts, Value: 42})
 	if err != nil {
 		dief("error writing: %v", err)
