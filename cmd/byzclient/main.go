@@ -50,7 +50,8 @@ func main() {
 		dief("error creating config: %v", err)
 	}
 
-	ack, err := conf.Write(&byzq.State{Timestamp: 9, Value: 42})
+	byzQSpec.wts++ //todo(meling) encapsulate this in a constructor, state/msg generator, or something
+	ack, err := conf.Write(&byzq.State{Timestamp: byzQSpec.wts, Value: 42})
 	if err != nil {
 		dief("error writing: %v", err)
 	}
@@ -61,8 +62,6 @@ func main() {
 		dief("error reading: %v", err)
 	}
 	fmt.Println("r " + val.Reply.String())
-
-	// _ = conf
 }
 
 func dief(format string, a ...interface{}) {

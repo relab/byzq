@@ -53,6 +53,7 @@ func (r *register) Write(ctx context.Context, s *byzq.State) (*byzq.WriteRespons
 	r.Lock()
 	if s.Timestamp > r.state.Timestamp {
 		r.state = *s
+		wr.Timestamp = s.Timestamp
 		wr.Written = true
 	}
 	r.Unlock()
