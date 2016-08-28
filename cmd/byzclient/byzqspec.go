@@ -9,10 +9,10 @@ var defaultVal = byzq.State{Value: -1, Timestamp: -1}
 
 // ByzQ todo(doc) does something useful?
 type ByzQ struct {
-	wts int // write timestamp
-	n   int // size of system
-	f   int // tolerable number of failures
-	q   int // quorum size
+	wts int64 // write timestamp
+	n   int   // size of system
+	f   int   // tolerable number of failures
+	q   int   // quorum size
 }
 
 // NewByzQ returns a Byzantine masking quorum specification.
@@ -54,9 +54,12 @@ func (bq *ByzQ) ReadQF(replies []*byzq.State) (*byzq.State, bool) {
 // method returns a single write response and true.
 func (bq *ByzQ) WriteQF(replies []*byzq.WriteResponse) (*byzq.WriteResponse, bool) {
 	if len(replies) <= bq.q {
-		// fmt.Println("reply len()=" + strconv.Itoa(len(replies)))
 		return nil, false
 	}
-
+	for _, ack := range replies {
+		if bq.wts != ack.Timestamp {
+			return nil, false
+		}
+	}
 	return replies[0], true
 }
