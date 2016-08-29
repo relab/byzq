@@ -31,7 +31,7 @@ func NewByzQ(n int) (*ByzQ, error) {
 
 // todo(meling) this wts is only suitable for single writer registers; multiple writers could perhaps be supported if wts was a combination of pid and wts?
 func (bq *ByzQ) newWrite(val int64) *byzq.State {
-	bq.wts++ //todo(meling) this needs a mutex lock
+	bq.wts++ //todo(meling) this needs a mutex lock (maybe??)
 	return &byzq.State{Timestamp: bq.wts, Value: val}
 }
 
