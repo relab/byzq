@@ -38,31 +38,6 @@ func (bq *ByzQ) newWrite(val int64) *byzq.State {
 // ReadQF returns nil and false until the supplied replies
 // constitute a Byzantine masking quorum, at which point the
 // method returns a single state and true.
-func (bq *ByzQ) OLDReadQF(replies []*byzq.State) (*byzq.State, bool) {
-	if len(replies) <= bq.q {
-		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
-		return nil, false
-	}
-	// filter out highest val that appears at least f times
-	same := make(map[byzq.State]int)
-	for _, reply := range replies {
-		same[*reply]++
-	}
-	highest := defaultVal
-	for reply, count := range same {
-		// select reply with highest timestamp if it has more than f replies
-		if count > bq.f && reply.Timestamp > highest.Timestamp {
-			highest = reply
-		}
-	}
-	// returns the reply with the highest timestamp, or if no quorum for
-	// the same timestamp-value pair has been found, the defaultVal is returned.
-	return &highest, true
-}
-
-// ReadQF returns nil and false until the supplied replies
-// constitute a Byzantine masking quorum, at which point the
-// method returns a single state and true.
 func (bq *ByzQ) ReadQF(replies []*byzq.State) (*byzq.State, bool) {
 	if len(replies) <= bq.q {
 		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
