@@ -70,7 +70,7 @@ func main() {
 			dief("error reading: %v", err)
 		}
 		if val.Reply.Timestamp > byzQSpec.wts {
-
+			byzQSpec.wts = val.Reply.Timestamp
 		}
 		fmt.Println("r " + val.Reply.String())
 		time.Sleep(1 * time.Second)
