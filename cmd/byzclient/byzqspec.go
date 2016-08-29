@@ -31,14 +31,14 @@ func NewByzQ(n int) (*ByzQ, error) {
 
 // todo(meling) this wts is only suitable for single writer registers; multiple writers could perhaps be supported if wts was a combination of pid and wts?
 func (bq *ByzQ) newWrite(val int64) *byzq.State {
-	bq.wts++
+	bq.wts++ //todo(meling) this needs a mutex lock
 	return &byzq.State{Timestamp: bq.wts, Value: val}
 }
 
 // ReadQF returns nil and false until the supplied replies
 // constitute a Byzantine masking quorum, at which point the
 // method returns a single state and true.
-func (bq *ByzQ) ReadQF(replies []*byzq.State) (*byzq.State, bool) {
+func (bq *ByzQ) OLDReadQF(replies []*byzq.State) (*byzq.State, bool) {
 	if len(replies) <= bq.q {
 		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
 		return nil, false
@@ -53,6 +53,29 @@ func (bq *ByzQ) ReadQF(replies []*byzq.State) (*byzq.State, bool) {
 		// select reply with highest timestamp if it has more than f replies
 		if count > bq.f && reply.Timestamp > highest.Timestamp {
 			highest = reply
+		}
+	}
+	// returns the reply with the highest timestamp, or if no quorum for
+	// the same timestamp-value pair has been found, the defaultVal is returned.
+	return &highest, true
+}
+
+// ReadQF returns nil and false until the supplied replies
+// constitute a Byzantine masking quorum, at which point the
+// method returns a single state and true.
+func (bq *ByzQ) ReadQF(replies []*byzq.State) (*byzq.State, bool) {
+	if len(replies) <= bq.q {
+		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
+		return nil, false
+	}
+	// filter out highest val that appears at least f times
+	same := make(map[byzq.State]int)
+	highest := defaultVal
+	for _, reply := range replies {
+		same[*reply]++
+		// select reply with highest timestamp if it has more than f replies
+		if same[*reply] > bq.f && reply.Timestamp > highest.Timestamp {
+			highest = *reply
 		}
 	}
 	// returns the reply with the highest timestamp, or if no quorum for

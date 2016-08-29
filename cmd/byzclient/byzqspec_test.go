@@ -13,6 +13,10 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
+// run tests with: go test -v
+
+// run benchmarks: go test -run=$$ -benchmem -benchtime=5s -bench=.
+
 func TestMain(m *testing.M) {
 	silentLogger := log.New(ioutil.Discard, "", log.LstdFlags)
 	grpclog.SetLogger(silentLogger)
@@ -177,6 +181,29 @@ var byzReadQFTests = []struct {
 			{Timestamp: 1, Value: 2},
 			{Timestamp: 1, Value: 2},
 			myVal,
+			myVal,
+			myVal,
+		},
+		myVal,
+		true,
+	},
+	{
+		"base-case quorum",
+		[]*byzq.State{
+			myVal,
+			myVal,
+			myVal,
+			myVal,
+		},
+		myVal,
+		true,
+	},
+	{
+		"approx. worst-case quorum",
+		[]*byzq.State{
+			{Timestamp: 1, Value: 2},
+			{Timestamp: 2, Value: 4},
+			{Timestamp: 1, Value: 5},
 			myVal,
 			myVal,
 		},
