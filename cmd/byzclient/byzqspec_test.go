@@ -52,6 +52,9 @@ func TestByzQ(t *testing.T) {
 		if bq.f != test.f {
 			t.Errorf("got f=%d, expected f=%d", bq.f, test.f)
 		}
+		if bq.q != test.q {
+			t.Errorf("got q=%d, expected q=%d", bq.q, test.q)
+		}
 	}
 
 }
