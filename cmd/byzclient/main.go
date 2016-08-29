@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -44,25 +45,36 @@ func main() {
 	}
 
 	ids := mgr.NodeIDs()
-	byzQSpec := NewByzQ(len(ids), 1) // todo(meling) change signature to produce error if wrong ids size.
+	byzQSpec, err := NewByzQ(len(ids))
+	if err != nil {
+		dief("%v", err)
+	}
 	conf, err := mgr.NewConfiguration(ids, byzQSpec, time.Second)
 	if err != nil {
 		dief("error creating config: %v", err)
 	}
 
-	byzQSpec.wts++ //todo(meling) encapsulate this in a constructor, state/msg generator, or something
-	// todo(meling) this wts is only suitable for single writer registers; multiple writers could perhaps be supported if wts was a combination of pid and wts?
-	ack, err := conf.Write(&byzq.State{Timestamp: byzQSpec.wts, Value: 42})
-	if err != nil {
-		dief("error writing: %v", err)
-	}
-	fmt.Println("w " + ack.Reply.String())
+	for {
+		state := byzQSpec.newWrite(int64(rand.Intn(1 << 8)))
+		fmt.Println("writing:", state)
+		ack, err := conf.Write(state)
+		if err != nil {
+			dief("error writing: %v", err)
+		}
+		fmt.Println("w " + ack.Reply.String())
 
-	val, err := conf.Read(&byzq.Empty{})
-	if err != nil {
-		dief("error reading: %v", err)
+		time.Sleep(1 * time.Second)
+
+		val, err := conf.Read(&byzq.Empty{})
+		if err != nil {
+			dief("error reading: %v", err)
+		}
+		if val.Reply.Timestamp > byzQSpec.wts {
+
+		}
+		fmt.Println("r " + val.Reply.String())
+		time.Sleep(1 * time.Second)
 	}
-	fmt.Println("r " + val.Reply.String())
 }
 
 func dief(format string, a ...interface{}) {

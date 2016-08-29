@@ -21,6 +21,41 @@ func TestMain(m *testing.M) {
 	os.Exit(res)
 }
 
+var byzQTests = []struct {
+	n   int
+	f   int // expected value
+	q   int // expected value
+	err string
+}{
+	{4, 0, 2, "Byzantine masking quorums require n>4f replicas; only got n=4, yielding f=0"},
+	{5, 1, 3, ""},
+	{6, 1, 4, ""},
+	{7, 1, 4, ""},
+	{8, 1, 5, ""},
+	{9, 2, 6, ""},
+	{10, 2, 7, ""},
+	{11, 2, 7, ""},
+	{12, 2, 8, ""},
+	{13, 3, 9, ""},
+	{14, 3, 10, ""},
+}
+
+func TestByzQ(t *testing.T) {
+	for _, test := range byzQTests {
+		bq, err := NewByzQ(test.n)
+		if err != nil {
+			if err.Error() != test.err {
+				t.Errorf("got '%v', expected '%v'", err.Error(), test.err)
+			}
+			continue
+		}
+		if bq.f != test.f {
+			t.Errorf("got f=%d, expected f=%d", bq.f, test.f)
+		}
+	}
+
+}
+
 const val = 42
 
 var myVal = &byzq.State{Timestamp: 3, Value: val}
@@ -147,43 +182,39 @@ var byzReadQFTests = []struct {
 	},
 }
 
-var qspecs = []struct {
-	name string
-	spec byzq.QuorumSpec
-}{
-	{"ByzQ(5,1)", NewByzQ(5, 1)},
-	// {"ByzQ(9,2)", NewByzQ(9, 2)},
-}
-
 func TestByzReadQF(t *testing.T) {
-	for _, qspec := range qspecs {
-		for _, test := range byzReadQFTests {
-			t.Run(qspec.name+"-"+test.name, func(t *testing.T) {
-				reply, byzquorum := qspec.spec.ReadQF(test.replies)
-				if byzquorum != test.rq {
-					t.Errorf("got %t, want %t", byzquorum, test.rq)
-				}
-				if !reply.Equal(test.expected) {
-					t.Errorf("got %d, want %d as quorum reply", reply, test.expected)
-				}
-			})
-		}
+	qspec, err := NewByzQ(5)
+	if err != nil {
+		t.Error(err)
+	}
+	for _, test := range byzReadQFTests {
+		t.Run("ByzQ(5,1)-"+test.name, func(t *testing.T) {
+			reply, byzquorum := qspec.ReadQF(test.replies)
+			if byzquorum != test.rq {
+				t.Errorf("got %t, want %t", byzquorum, test.rq)
+			}
+			if !reply.Equal(test.expected) {
+				t.Errorf("got %d, want %d as quorum reply", reply, test.expected)
+			}
+		})
 	}
 }
 
 func BenchmarkByzReadQF(b *testing.B) {
-	for _, qspec := range qspecs {
-		for _, test := range byzReadQFTests {
-			if !strings.Contains(test.name, "case") {
-				continue
-			}
-			b.Run(qspec.name+"-"+test.name, func(b *testing.B) {
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					qspec.spec.ReadQF(test.replies)
-				}
-			})
+	qspec, err := NewByzQ(5)
+	if err != nil {
+		b.Error(err)
+	}
+	for _, test := range byzReadQFTests {
+		if !strings.Contains(test.name, "case") {
+			continue
 		}
+		b.Run("ByzQ(5,1)-"+test.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				qspec.ReadQF(test.replies)
+			}
+		})
 	}
 }

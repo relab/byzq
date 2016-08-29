@@ -1,6 +1,10 @@
 package main
 
-import "github.com/relab/byzq/proto/byzq"
+import (
+	"fmt"
+
+	"github.com/relab/byzq/proto/byzq"
+)
 
 // defaultVal is returned by the register when no quorum is reached.
 // It is considered safe to return this value, rather than returning
@@ -15,13 +19,20 @@ type ByzQ struct {
 	q   int   // quorum size
 }
 
-// NewByzQ returns a Byzantine masking quorum specification.
-func NewByzQ(n, f int) *ByzQ {
-	if n <= 4 {
-		return nil
+// NewByzQ returns a Byzantine masking quorum specification or nil and an error
+// if the quorum requirements are not satisifed.
+func NewByzQ(n int) (*ByzQ, error) {
+	f := (n - 1) / 4
+	if f < 1 {
+		return nil, fmt.Errorf("Byzantine masking quorums require n>4f replicas; only got n=%d, yielding f=%d", n, f)
 	}
-	//todo(meling) should return error if n too low to satisfy f.
-	return &ByzQ{0, n, f, (n + 2*f) / 2}
+	return &ByzQ{0, n, f, (n + 2*f) / 2}, nil
+}
+
+// todo(meling) this wts is only suitable for single writer registers; multiple writers could perhaps be supported if wts was a combination of pid and wts?
+func (bq *ByzQ) newWrite(val int64) *byzq.State {
+	bq.wts++
+	return &byzq.State{Timestamp: bq.wts, Value: val}
 }
 
 // ReadQF returns nil and false until the supplied replies
