@@ -19,6 +19,7 @@ const localAddrs = ":8080,:8081,:8082,:8083,:8084"
 
 func main() {
 	saddrs := flag.String("addrs", localAddrs, "server addresses separated by ','")
+	writer := flag.Bool("writer", false, "set this client to be writer only (default is reader only)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n", os.Args[0])
@@ -62,26 +63,34 @@ func main() {
 		dief("error creating config: %v", err)
 	}
 
+	registerState := byzq.State{Value: int64(rand.Intn(1 << 8))}
 	for {
-		state := byzQSpec.newWrite(int64(rand.Intn(1 << 8)))
-		fmt.Println("writing:", state)
-		ack, err := conf.Write(state)
-		if err != nil {
-			dief("error writing: %v", err)
+		if *writer {
+			// Writer client
+			registerState.Value = int64(rand.Intn(1 << 8))
+			// registerState.Timestamp++
+			fmt.Println("writing: ", registerState.String())
+			ack, err := conf.Write(&registerState)
+			if err != nil {
+				dief("error writing: %v", err)
+			}
+			fmt.Println("w " + ack.Reply.String())
+			if ack.Reply.Timestamp > registerState.Timestamp {
+				registerState.Timestamp = ack.Reply.Timestamp
+			}
+			time.Sleep(1 * time.Second)
+		} else {
+			// Reader client
+			val, err := conf.Read(&byzq.Empty{})
+			if err != nil {
+				dief("error reading: %v", err)
+			}
+			if val.Reply.Timestamp > registerState.Timestamp {
+				registerState.Timestamp = val.Reply.Timestamp
+			}
+			fmt.Println("read: " + registerState.String())
+			time.Sleep(50 * time.Millisecond)
 		}
-		fmt.Println("w " + ack.Reply.String())
-
-		time.Sleep(1 * time.Second)
-
-		val, err := conf.Read(&byzq.Empty{})
-		if err != nil {
-			dief("error reading: %v", err)
-		}
-		if val.Reply.Timestamp > byzQSpec.wts {
-			byzQSpec.wts = val.Reply.Timestamp
-		}
-		fmt.Println("r " + val.Reply.String())
-		time.Sleep(1 * time.Second)
 	}
 }
 
