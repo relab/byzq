@@ -68,7 +68,7 @@ func main() {
 		if *writer {
 			// Writer client
 			registerState.Value = int64(rand.Intn(1 << 8))
-			// registerState.Timestamp++
+			registerState.Timestamp++
 			fmt.Println("writing: ", registerState.String())
 			ack, err := conf.Write(&registerState)
 			if err != nil {

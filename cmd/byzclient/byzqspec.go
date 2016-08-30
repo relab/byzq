@@ -13,10 +13,9 @@ var defaultVal = byzq.State{Value: -1, Timestamp: -1}
 
 // ByzQ todo(doc) does something useful?
 type ByzQ struct {
-	wts int64 // write timestamp
-	n   int   // size of system
-	f   int   // tolerable number of failures
-	q   int   // quorum size
+	n int // size of system
+	f int // tolerable number of failures
+	q int // quorum size
 }
 
 // NewByzQ returns a Byzantine masking quorum specification or nil and an error
@@ -26,13 +25,7 @@ func NewByzQ(n int) (*ByzQ, error) {
 	if f < 1 {
 		return nil, fmt.Errorf("Byzantine masking quorums require n>4f replicas; only got n=%d, yielding f=%d", n, f)
 	}
-	return &ByzQ{0, n, f, (n + 2*f) / 2}, nil
-}
-
-// todo(meling) this wts is only suitable for single writer registers; multiple writers could perhaps be supported if wts was a combination of pid and wts?
-func (bq *ByzQ) newWrite(val int64) *byzq.State {
-	bq.wts++ //todo(meling) this needs a mutex lock (maybe??)
-	return &byzq.State{Timestamp: bq.wts, Value: val}
+	return &ByzQ{n, f, (n + 2*f) / 2}, nil
 }
 
 // ReadQF returns nil and false until the supplied replies
@@ -64,11 +57,6 @@ func (bq *ByzQ) ReadQF(replies []*byzq.State) (*byzq.State, bool) {
 func (bq *ByzQ) WriteQF(replies []*byzq.WriteResponse) (*byzq.WriteResponse, bool) {
 	if len(replies) <= bq.q {
 		return nil, false
-	}
-	for _, ack := range replies {
-		if bq.wts != ack.Timestamp {
-			return nil, false
-		}
 	}
 	return replies[0], true
 }
