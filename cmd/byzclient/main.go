@@ -12,6 +12,7 @@ import (
 	"github.com/relab/byzq/proto/byzq"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 const localAddrs = ":8080,:8081,:8082,:8083,:8084"
@@ -32,17 +33,24 @@ func main() {
 	}
 	log.Println("#addrs:", len(addrs))
 
+	//TODO fix hardcoded youtube server name (can we get certificate for localhost servername?)
+	clientCreds, err := credentials.NewClientTLSFromFile("cert/ca.pem", "x.test.youtube.com")
+	if err != nil {
+		dief("error creating credentials: %v", err)
+	}
+
 	mgr, err := byzq.NewManager(
 		addrs,
 		byzq.WithGrpcDialOptions(
 			grpc.WithBlock(),
-			grpc.WithInsecure(),
-			grpc.WithTimeout(5*time.Second),
+			grpc.WithTimeout(1000*time.Millisecond),
+			grpc.WithTransportCredentials(clientCreds),
 		),
 	)
 	if err != nil {
 		dief("error creating manager: %v", err)
 	}
+	defer mgr.Close()
 
 	ids := mgr.NodeIDs()
 	byzQSpec, err := NewByzQ(len(ids))
