@@ -20,6 +20,7 @@ const localAddrs = ":8080,:8081,:8082,:8083,:8084"
 func main() {
 	saddrs := flag.String("addrs", localAddrs, "server addresses separated by ','")
 	writer := flag.Bool("writer", false, "set this client to be writer only (default is reader only)")
+	protocol := flag.String("protocol", "byzq", "protocol to use in the experiment (options: byzq, authq)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n", os.Args[0])
@@ -54,7 +55,13 @@ func main() {
 	defer mgr.Close()
 
 	ids := mgr.NodeIDs()
-	qspec, err := NewByzQ(len(ids))
+	var qspec byzq.QuorumSpec
+	switch *protocol {
+	case "byzq":
+		qspec, err = NewByzQ(len(ids))
+	case "autoq":
+		qspec, err = NewAuthDataQ(len(ids))
+	}
 	if err != nil {
 		dief("%v", err)
 	}
