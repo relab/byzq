@@ -24,6 +24,6 @@ _testmain.go
 *.prof
 
 # binary files
-byzserver
-byzclient
+cmd/byzserver/byzserver
+cmd/byzclient/byzclient
 
