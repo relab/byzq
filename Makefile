@@ -1,8 +1,5 @@
 PROTOC_PLUGIN 			:= gorums_out
 
-PROTO_PKG 			:= proto
-PROTO_GQRPC_PKG_RPATH 		:= $(PROTO_PKG)/byzq
-
 .PHONY: installprotocgorums
 installprotocgorums:
 	@echo installing protoc-gen-gorums with gorums linked...
@@ -10,7 +7,7 @@ installprotocgorums:
 
 .PHONY: proto
 proto: installprotocgorums
-	protoc --$(PROTOC_PLUGIN)=plugins=grpc+gorums:. $(PROTO_GQRPC_PKG_RPATH)/byzq.proto
+	protoc --$(PROTOC_PLUGIN)=plugins=grpc+gorums:. byzq.proto
 
 .PHONY: bench 
 bench:
