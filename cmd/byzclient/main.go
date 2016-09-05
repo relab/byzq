@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/relab/byzq/proto/byzq"
+	"github.com/relab/byzq"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -54,11 +54,11 @@ func main() {
 	defer mgr.Close()
 
 	ids := mgr.NodeIDs()
-	byzQSpec, err := NewByzQ(len(ids))
+	qspec, err := NewByzQ(len(ids))
 	if err != nil {
 		dief("%v", err)
 	}
-	conf, err := mgr.NewConfiguration(ids, byzQSpec, time.Second)
+	conf, err := mgr.NewConfiguration(ids, qspec, time.Second)
 	if err != nil {
 		dief("error creating config: %v", err)
 	}

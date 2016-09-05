@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/relab/byzq/proto/byzq"
+	"github.com/relab/byzq"
 )
 
 // AuthDataQ todo(doc) does something useful?

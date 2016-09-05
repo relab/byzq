@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/relab/byzq/proto/byzq"
+	"github.com/relab/byzq"
 )
 
 // defaultVal is returned by the register when no quorum is reached.
