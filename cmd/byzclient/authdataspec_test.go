@@ -1,52 +1,47 @@
 package main
 
 import (
-	"io/ioutil"
-	"log"
-	"os"
 	"strings"
 	"testing"
 
 	. "github.com/relab/byzq"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 )
 
 // run tests with: go test -v
 
 // run benchmarks: go test -run=$$ -benchmem -benchtime=5s -bench=.
 
-func TestMain(m *testing.M) {
-	silentLogger := log.New(ioutil.Discard, "", log.LstdFlags)
-	grpclog.SetLogger(silentLogger)
-	grpc.EnableTracing = false
-	res := m.Run()
-	os.Exit(res)
-}
+// func TestMain(m *testing.M) {
+// 	silentLogger := log.New(ioutil.Discard, "", log.LstdFlags)
+// 	grpclog.SetLogger(silentLogger)
+// 	grpc.EnableTracing = false
+// 	res := m.Run()
+// 	os.Exit(res)
+// }
 
-var byzQTests = []struct {
+var authQTests = []struct {
 	n   int
 	f   int // expected value
 	q   int // expected value
 	err string
 }{
-	{4, 0, 2, "Byzantine masking quorums require n>4f replicas; only got n=4, yielding f=0"},
+	{3, 0, 2, "Byzantine quorum require n>3f replicas; only got n=3, yielding f=0"},
+	{4, 1, 2, ""},
 	{5, 1, 3, ""},
-	{6, 1, 4, ""},
-	{7, 1, 4, ""},
-	{8, 1, 5, ""},
-	{9, 2, 6, ""},
-	{10, 2, 7, ""},
-	{11, 2, 7, ""},
-	{12, 2, 8, ""},
-	{13, 3, 9, ""},
-	{14, 3, 10, ""},
+	{6, 1, 3, ""},
+	{7, 2, 4, ""},
+	{8, 2, 5, ""},
+	{9, 2, 5, ""},
+	{10, 3, 6, ""},
+	{11, 3, 7, ""},
+	{12, 3, 7, ""},
+	{13, 4, 8, ""},
+	{14, 4, 9, ""},
 }
 
-func TestByzQ(t *testing.T) {
-	for _, test := range byzQTests {
-		bq, err := NewByzQ(test.n)
+func TestAuthDataQ(t *testing.T) {
+	for _, test := range authQTests {
+		bq, err := NewAuthDataQ(test.n)
 		if err != nil {
 			if err.Error() != test.err {
 				t.Errorf("got '%v', expected '%v'", err.Error(), test.err)
@@ -63,7 +58,12 @@ func TestByzQ(t *testing.T) {
 
 }
 
-var byzReadQFTests = []struct {
+var (
+	myContent = &Content{Key: "Winnie", Value: "Poo", Timestamp: 3}
+	myVal     = &Value{C: myContent}
+)
+
+var authReadQFTests = []struct {
 	name     string
 	replies  []*Value
 	expected *Value
@@ -208,7 +208,7 @@ var byzReadQFTests = []struct {
 	},
 }
 
-func TestByzReadQF(t *testing.T) {
+func TestAuthDataReadQF(t *testing.T) {
 	qspec, err := NewByzQ(5)
 	if err != nil {
 		t.Error(err)
@@ -220,13 +220,13 @@ func TestByzReadQF(t *testing.T) {
 				t.Errorf("got %t, want %t", byzquorum, test.rq)
 			}
 			if !reply.Equal(test.expected) {
-				t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+				t.Errorf("got %d, want %d as quorum reply", reply, test.expected)
 			}
 		})
 	}
 }
 
-func BenchmarkByzReadQF(b *testing.B) {
+func BenchmarkAuthDataReadQF(b *testing.B) {
 	qspec, err := NewByzQ(5)
 	if err != nil {
 		b.Error(err)
