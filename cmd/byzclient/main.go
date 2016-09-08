@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,6 +36,44 @@ func main() {
 	}
 	log.Println("#addrs:", len(addrs))
 
+	// certFile := "cert/ca.pem"
+	// serverName := "x.test.youtube.com"
+	// pemCerts, err := ioutil.ReadFile(certFile)
+	// if err != nil {
+	// 	dief("error creating credentials: %v", err)
+	// }
+
+	// for len(pemCerts) > 0 {
+	// 	var block *pem.Block
+	// 	block, pemCerts = pem.Decode(pemCerts)
+	// 	if block == nil {
+	// 		break
+	// 	}
+	// 	if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+	// 		continue
+	// 	}
+
+	// 	cert, err := x509.ParseCertificate(block.Bytes)
+	// 	if err != nil {
+	// 		continue
+	// 	}
+	// 	//  .CheckSignature()
+	// 	// cert.Signature
+	// 	fmt.Printf("%v: %v\n", cert.SignatureAlgorithm, cert.Signature)
+	// 	// s.AddCert(cert)
+	// 	// ok = true
+	// }
+
+	// // cert, err := x509.ParseCertificate(b)
+	// // if err != nil {
+	// // 	dief("credentials: failed to append certificatesxxx")
+	// // }
+	// cp := x509.NewCertPool()
+	// if !cp.AppendCertsFromPEM(pemCerts) {
+	// 	dief("credentials: failed to append certificates")
+	// }
+	// clientCreds := credentials.NewTLS(&tls.Config{ServerName: serverName, RootCAs: cp})
+
 	//TODO fix hardcoded youtube server name (can we get certificate for localhost servername?)
 	clientCreds, err := credentials.NewClientTLSFromFile("cert/ca.pem", "x.test.youtube.com")
 	if err != nil {
@@ -45,7 +84,7 @@ func main() {
 		addrs,
 		byzq.WithGrpcDialOptions(
 			grpc.WithBlock(),
-			grpc.WithTimeout(1000*time.Millisecond),
+			grpc.WithTimeout(0*time.Millisecond),
 			grpc.WithTransportCredentials(clientCreds),
 		),
 	)
@@ -59,8 +98,8 @@ func main() {
 	switch *protocol {
 	case "byzq":
 		qspec, err = NewByzQ(len(ids))
-	case "autoq":
-		qspec, err = NewAuthDataQ(len(ids))
+		// case "authq":
+		// 	qspec, err = NewAuthDataQ(len(ids))
 	}
 	if err != nil {
 		dief("%v", err)
@@ -70,31 +109,41 @@ func main() {
 		dief("error creating config: %v", err)
 	}
 
-	registerState := byzq.State{Value: int64(rand.Intn(1 << 8))}
+	content := &byzq.Content{
+		Key:       "Hein",
+		Value:     "Meling",
+		Timestamp: -1,
+	}
+
+	// TODO(meling) Sign this content object (for the authq protocol)
+
+	registerState := byzq.Value{C: content}
 	for {
 		if *writer {
 			// Writer client
-			registerState.Value = int64(rand.Intn(1 << 8))
-			registerState.Timestamp++
+			k := rand.Intn(1 << 8)
+			registerState.C.Value = strconv.Itoa(k)
+			registerState.C.Timestamp++
 			fmt.Println("writing: ", registerState.String())
 			ack, err := conf.Write(&registerState)
 			if err != nil {
 				dief("error writing: %v", err)
 			}
 			fmt.Println("w " + ack.Reply.String())
-			if ack.Reply.Timestamp > registerState.Timestamp {
-				registerState.Timestamp = ack.Reply.Timestamp
+			if ack.Reply.Timestamp > registerState.C.Timestamp {
+				registerState.C.Timestamp = ack.Reply.Timestamp
 			}
 			time.Sleep(1 * time.Second)
 		} else {
 			// Reader client
-			val, err := conf.Read(&byzq.Empty{})
+			val, err := conf.Read(&byzq.Key{Key: content.Key})
 			if err != nil {
 				dief("error reading: %v", err)
 			}
-			if val.Reply.Timestamp > registerState.Timestamp {
-				registerState.Timestamp = val.Reply.Timestamp
+			if val.Reply.C.Timestamp > registerState.C.Timestamp {
+				registerState.C.Timestamp = val.Reply.C.Timestamp
 			}
+			registerState = *val.Reply
 			fmt.Println("read: " + registerState.String())
 			time.Sleep(50 * time.Millisecond)
 		}

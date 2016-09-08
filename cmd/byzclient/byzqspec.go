@@ -9,7 +9,9 @@ import (
 // defaultVal is returned by the register when no quorum is reached.
 // It is considered safe to return this value, rather than returning
 // a reply that does not constitute a quorum.
-var defaultVal = byzq.State{Value: -1, Timestamp: -1}
+var defaultVal = byzq.Value{
+	C: &byzq.Content{Timestamp: -1},
+}
 
 // ByzQ todo(doc) does something useful?
 type ByzQ struct {
@@ -30,19 +32,19 @@ func NewByzQ(n int) (*ByzQ, error) {
 
 // ReadQF returns nil and false until the supplied replies
 // constitute a Byzantine masking quorum, at which point the
-// method returns a single state and true.
-func (bq *ByzQ) ReadQF(replies []*byzq.State) (*byzq.State, bool) {
+// method returns a single Value and true.
+func (bq *ByzQ) ReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
 	if len(replies) <= bq.q {
 		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
 		return nil, false
 	}
 	// filter out highest val that appears at least f times
-	same := make(map[byzq.State]int)
+	same := make(map[byzq.Content]int)
 	highest := defaultVal
 	for _, reply := range replies {
-		same[*reply]++
+		same[*reply.C]++
 		// select reply with highest timestamp if it has more than f replies
-		if same[*reply] > bq.f && reply.Timestamp > highest.Timestamp {
+		if same[*reply.C] > bq.f && reply.C.Timestamp > highest.C.Timestamp {
 			highest = *reply
 		}
 	}

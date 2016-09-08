@@ -12,12 +12,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/relab/byzq/proto/byzq"
+	"github.com/relab/byzq"
 )
 
 type register struct {
 	sync.RWMutex
-	state byzq.State
+	state map[string]byzq.Value
 }
 
 func main() {
@@ -45,22 +45,24 @@ func main() {
 	}
 	opts := []grpc.ServerOption{grpc.Creds(creds)}
 	grpcServer := grpc.NewServer(opts...)
-	byzq.RegisterRegisterServer(grpcServer, &register{})
+	smap := make(map[string]byzq.Value)
+	byzq.RegisterRegisterServer(grpcServer, &register{state: smap})
 	log.Fatal(grpcServer.Serve(l))
 }
 
-func (r *register) Read(ctx context.Context, e *byzq.Empty) (*byzq.State, error) {
+func (r *register) Read(ctx context.Context, k *byzq.Key) (*byzq.Value, error) {
 	r.RLock()
-	state := r.state
+	value := r.state[k.Key]
 	r.RUnlock()
-	return &state, nil
+	return &value, nil
 }
 
-func (r *register) Write(ctx context.Context, s *byzq.State) (*byzq.WriteResponse, error) {
-	wr := &byzq.WriteResponse{Timestamp: s.Timestamp}
+func (r *register) Write(ctx context.Context, v *byzq.Value) (*byzq.WriteResponse, error) {
+	wr := &byzq.WriteResponse{Timestamp: v.C.Timestamp}
 	r.Lock()
-	if s.Timestamp > r.state.Timestamp {
-		r.state = *s
+	val, found := r.state[v.C.Key]
+	if !found || v.C.Timestamp > val.C.Timestamp {
+		r.state[v.C.Key] = *v
 	}
 	r.Unlock()
 	return wr, nil
