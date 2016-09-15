@@ -660,12 +660,15 @@ func (n *Node) close() error {
 
 // QuorumSpec is the interface that wraps every quorum function.
 type QuorumSpec interface {
-	//TODO HACK SHOULD BE ADDED TO GENERATOR, MAYBE??
-	Sign(content *Content) (*Value, error)
 	// ReadQF is the quorum function for the Read RPC method.
 	ReadQF(replies []*Value) (*Value, bool)
 	// WriteQF is the quorum function for the Write RPC method.
 	WriteQF(replies []*WriteResponse) (*WriteResponse, bool)
+}
+
+// PreFn is a test of the pre-write function call used by gorums.
+type PreFn interface {
+	PreWrite(args Value) error
 }
 
 /* Static resources */

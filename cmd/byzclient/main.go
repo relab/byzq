@@ -73,8 +73,6 @@ func main() {
 	} else {
 		b := make([]byte, 500)
 		_, err := f.Read(b)
-		// fmt.Println(n)
-		// fmt.Println(b)
 		if err != nil {
 			f.Close()
 			dief("failed to read key: %v", err)
@@ -92,17 +90,13 @@ func main() {
 
 	ids := mgr.NodeIDs()
 
-	pubs := make(map[int]*ecdsa.PublicKey)
-	for id := range ids {
-		pubs[id] = &key.PublicKey
-	}
-
-	var qspec byzq.QuorumSpec
+	// var qspec byzq.QuorumSpec
+	var qspec *AuthDataQ
 	switch *protocol {
 	case "byzq":
-		// qspec, err = NewByzQ(len(ids))
+		// 	qspec, err = NewByzQ(len(ids))
 		// case "authq":
-		qspec, err = NewAuthDataQ(len(ids), key, pubs)
+		qspec, err = NewAuthDataQ(len(ids), key, &key.PublicKey)
 	}
 	if err != nil {
 		dief("%v", err)
@@ -125,6 +119,13 @@ func main() {
 			k := rand.Intn(1 << 8)
 			registerState.C.Value = strconv.Itoa(k)
 			registerState.C.Timestamp++
+
+			// if p, ok := qspec.(byzq.PreFn); ok {
+			// 	err := p.PreWrite(*registerState)
+			// 	if err != nil {
+			// 		dief("failed to sign message: %v", err)
+			// 	}
+			// }
 			registerState, err = qspec.Sign(registerState.C)
 			if err != nil {
 				dief("failed to sign message: %v", err)

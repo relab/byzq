@@ -12,21 +12,30 @@ import (
 
 // AuthDataQ todo(doc) does something useful?
 type AuthDataQ struct {
-	n    int                      // size of system
-	f    int                      // tolerable number of failures
-	q    int                      // quorum size
-	priv *ecdsa.PrivateKey        // my private key for signing
-	pubs map[int]*ecdsa.PublicKey // map of public keys of other signers (nodes)
+	n    int               // size of system
+	f    int               // tolerable number of failures
+	q    int               // quorum size
+	priv *ecdsa.PrivateKey // my private key for signing
+	pubk *ecdsa.PublicKey  // map of public keys of other writers/signers (clients)
 }
 
 // NewAuthDataQ returns a Byzantine masking quorum specification or nil and an error
 // if the quorum requirements are not satisifed.
-func NewAuthDataQ(n int, priv *ecdsa.PrivateKey, pubs map[int]*ecdsa.PublicKey) (*AuthDataQ, error) {
+func NewAuthDataQ(n int, priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) (*AuthDataQ, error) {
 	f := (n - 1) / 3
 	if f < 1 {
 		return nil, fmt.Errorf("Byzantine quorum require n>3f replicas; only got n=%d, yielding f=%d", n, f)
 	}
-	return &AuthDataQ{n, f, (n + f) / 2, priv, pubs}, nil
+	return &AuthDataQ{n, f, (n + f) / 2, priv, pub}, nil
+}
+
+// PreWrite is invoked before Write()
+// TODO debug why this does not return a Value out (println after calling PreWrite)
+func (aq *AuthDataQ) PreWrite(args byzq.Value) (err error) {
+	a, err := aq.Sign(args.C)
+	args = *a
+	fmt.Println(a.SignatureR)
+	return
 }
 
 // Sign signs the provided content and returns a value to be passed into Write.
@@ -35,24 +44,11 @@ func (aq *AuthDataQ) Sign(content *byzq.Content) (*byzq.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("content = ", content.String())
-	fmt.Println("msg = ", msg)
 	hash := sha256.Sum256(msg)
+	fmt.Println(hash)
 	r, s, err := ecdsa.Sign(rand.Reader, aq.priv, hash[:])
 	if err != nil {
 		return nil, err
-	}
-	fmt.Println("signature:")
-	fmt.Println("hash = ", hash)
-	fmt.Println("r = ", r)
-	fmt.Println("s = ", s)
-
-	//TODO remove this test
-	if !ecdsa.Verify(&aq.priv.PublicKey, hash[:], r, s) {
-		fmt.Println("couldn't verify signature: ") // + val.String())
-		fmt.Println("hash = ", hash)
-		fmt.Println("r = ", r)
-		fmt.Println("s = ", s)
 	}
 	return &byzq.Value{C: content, SignatureR: r.Bytes(), SignatureS: s.Bytes()}, nil
 }
@@ -88,6 +84,8 @@ func (aq *AuthDataQ) verify(reply *byzq.Value) bool {
 // constitute a Byzantine masking quorum, at which point the
 // method returns a single state and true.
 func (aq *AuthDataQ) ReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
+	//TODO could also verify reply in goroutine here and also fire up a collection goroutine that keep track of things
+
 	if len(replies) <= aq.q {
 		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
 		return nil, false
@@ -96,6 +94,7 @@ func (aq *AuthDataQ) ReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
 	same := make(map[byzq.Content]int)
 	highest := defaultVal
 	for _, reply := range replies {
+		// TODO use goroutines to speed up this verification
 		if aq.verify(reply) {
 			same[*reply.C]++
 			// select reply with highest timestamp if it has more than f replies
