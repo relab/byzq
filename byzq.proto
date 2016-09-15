@@ -22,7 +22,8 @@ message Content {
 // [Write, wts, val, signature]
 message Value {
 	Content c = 1;
-	bytes signature = 2;
+	bytes signatureR = 2;
+	bytes signatureS = 3;
 } 
 
 // [Ack, ts]

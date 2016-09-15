@@ -27,3 +27,7 @@ _testmain.go
 cmd/byzserver/byzserver
 cmd/byzclient/byzclient
 
+# key files
+my-key.pem
+
+
