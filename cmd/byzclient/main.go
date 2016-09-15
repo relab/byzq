@@ -2,9 +2,6 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	crand "crypto/rand"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
@@ -64,28 +61,6 @@ func main() {
 	}
 	defer mgr.Close()
 
-	ids := mgr.NodeIDs()
-	var qspec byzq.QuorumSpec
-	switch *protocol {
-	case "byzq":
-		qspec, err = NewByzQ(len(ids))
-		// case "authq":
-		// 	qspec, err = NewAuthDataQ(len(ids))
-	}
-	if err != nil {
-		dief("%v", err)
-	}
-	conf, err := mgr.NewConfiguration(ids, qspec, time.Second)
-	if err != nil {
-		dief("error creating config: %v", err)
-	}
-
-	content := &byzq.Content{
-		Key:       "Hein",
-		Value:     "Meling",
-		Timestamp: -1,
-	}
-
 	keyFile := "my-key.pem"
 
 	// Crypto (TODO clean up later)
@@ -94,36 +69,7 @@ func main() {
 
 	f, err := os.Open(keyFile)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			dief("failed to open key file: %v", err)
-		}
-		f, err = os.Create(keyFile)
-		if err != nil {
-			dief("failed to create key file: %v", err)
-		}
-
-		DefaultCurve := elliptic.P256()
-		key, err = ecdsa.GenerateKey(DefaultCurve, crand.Reader)
-		if err != nil {
-			f.Close()
-			dief("failed to generate keys: %v", err)
-		}
-
-		// keypem, err := os.OpenFile("ec-key.pem", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-		ec, err := x509.MarshalECPrivateKey(key)
-		pem.Encode(f, &pem.Block{
-			Type:  "EC PRIVATE KEY",
-			Bytes: ec,
-		})
-
-		// secp256r1, err := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 840, 10045, 3, 1, 7})
-		// pem.Encode(f, &pem.Block{Type: "EC PARAMETERS", Bytes: secp256r1})
-
-		if err != nil {
-			f.Close()
-			dief("failed to write key: %v\n %v", err, key)
-		}
-		f.Close()
+		dief("key file not found: %v", err)
 	} else {
 		b := make([]byte, 500)
 		_, err := f.Read(b)
@@ -144,42 +90,46 @@ func main() {
 		}
 	}
 
-	// TODO(meling) Sign this content object (for the authq protocol)
+	ids := mgr.NodeIDs()
 
-	registerState := byzq.Value{C: content}
+	pubs := make(map[int]*ecdsa.PublicKey)
+	for id := range ids {
+		pubs[id] = &key.PublicKey
+	}
+
+	var qspec byzq.QuorumSpec
+	switch *protocol {
+	case "byzq":
+		// qspec, err = NewByzQ(len(ids))
+		// case "authq":
+		qspec, err = NewAuthDataQ(len(ids), key, pubs)
+	}
+	if err != nil {
+		dief("%v", err)
+	}
+	conf, err := mgr.NewConfiguration(ids, qspec, time.Second)
+	if err != nil {
+		dief("error creating config: %v", err)
+	}
+
+	content := &byzq.Content{
+		Key:       "Hein",
+		Value:     "Meling",
+		Timestamp: -1,
+	}
+
+	registerState := &byzq.Value{C: content}
 	for {
 		if *writer {
 			// Writer client
 			k := rand.Intn(1 << 8)
 			registerState.C.Value = strconv.Itoa(k)
 			registerState.C.Timestamp++
-			msg, err := registerState.C.Marshal()
+			registerState, err = qspec.Sign(registerState.C)
 			if err != nil {
-				dief("failed to marshal msg for signing: %v", err)
+				dief("failed to sign message: %v", err)
 			}
-			fmt.Println("content = ", registerState.C.String())
-			fmt.Println("msg = ", msg)
-			msgHash := sha256.Sum256(msg)
-			r, s, err := ecdsa.Sign(crand.Reader, key, msgHash[:])
-			if err != nil {
-				dief("failed to sign msg: %v", err)
-			}
-			fmt.Println("signature:")
-			fmt.Println("msgHash = ", msgHash)
-			fmt.Println("r = ", r)
-			fmt.Println("s = ", s)
-
-			if !ecdsa.Verify(&key.PublicKey, msgHash[:], r, s) {
-				fmt.Println("couldn't verify signature: ") // + val.String())
-				fmt.Println("msgHash = ", msgHash)
-				fmt.Println("r = ", r)
-				fmt.Println("s = ", s)
-			}
-
-			registerState.SignatureR = r.Bytes()
-			registerState.SignatureS = s.Bytes()
-			// fmt.Println("writing: ", registerState.String())
-			ack, err := conf.Write(&registerState)
+			ack, err := conf.Write(registerState)
 			if err != nil {
 				dief("error writing: %v", err)
 			}
@@ -191,33 +141,13 @@ func main() {
 		} else {
 			// Reader client
 			val, err := conf.Read(&byzq.Key{Key: content.Key})
-			// TODO add Byzantine behavior by changing return value and detect verify failure.
 			if err != nil {
 				dief("error reading: %v", err)
 			}
 			if val.Reply.C.Timestamp > registerState.C.Timestamp {
-				//TODO this should not happen if signature verification fails
 				registerState.C.Timestamp = val.Reply.C.Timestamp
 			}
-			msg, err := val.Reply.C.Marshal()
-			if err != nil {
-				dief("failed to marshal msg for verify: %v", err)
-			}
-			fmt.Println("content = ", val.Reply.C.String())
-			fmt.Println("msg = ", msg)
-
-			msgHash := sha256.Sum256(msg)
-			r := new(big.Int).SetBytes(val.Reply.SignatureR)
-			s := new(big.Int).SetBytes(val.Reply.SignatureS)
-			// s.Add(s, one) // Byzantine behavior (add 1 to signature field)
-
-			if !ecdsa.Verify(&key.PublicKey, msgHash[:], r, s) {
-				fmt.Println("couldn't verify signature: ") // + val.String())
-				fmt.Println("msgHash = ", msgHash)
-				fmt.Println("r = ", r)
-				fmt.Println("s = ", s)
-			}
-			registerState = *val.Reply
+			registerState = val.Reply
 			// fmt.Println("read: " + registerState.String())
 			time.Sleep(10000 * time.Millisecond)
 		}

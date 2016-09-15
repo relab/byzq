@@ -660,6 +660,8 @@ func (n *Node) close() error {
 
 // QuorumSpec is the interface that wraps every quorum function.
 type QuorumSpec interface {
+	//TODO HACK SHOULD BE ADDED TO GENERATOR, MAYBE??
+	Sign(content *Content) (*Value, error)
 	// ReadQF is the quorum function for the Read RPC method.
 	ReadQF(replies []*Value) (*Value, bool)
 	// WriteQF is the quorum function for the Write RPC method.
