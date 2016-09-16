@@ -122,17 +122,35 @@ func (aq *AuthDataQ) LReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
 	}
 
 	wg := sync.WaitGroup
+	falsecnt := new(chan bool, len(replies))
 	for _, reply := range replies {
 		wg.Add()
-		go func(atreply **byzq.Value) {
+		go func(atreply **byzq.Value, falsecnt chan bool) {
 			defer wg.Done()
 			if *atreply == nil {
+				falsecnt <- bool
 				return
 			}
 			if !aq.verify(*atreply) {
-				*atreply = nil
+				falsecnt <- bool
 			}
 		}(&reply)
+	}
+
+	cnt := 0
+emptychan_for:
+	for {
+		select {
+		case <-falsecnt:
+			cnt++
+		default:
+			break emptychan_for
+		}
+	}
+
+	if len(replies)-cnt <= aq.q {
+		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
+		return nil, false
 	}
 
 	// filter out highest val that appears at least f times
@@ -140,21 +158,14 @@ func (aq *AuthDataQ) LReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
 	highest := &defaultVal
 	wg.Wait()
 
-	cnt := 0
 	for _, reply := range replies {
 		if reply == nil {
 			continue
 		}
-		cnt++
 		// select reply with highest timestamp
 		if reply.C.Timestamp > highest.C.Timestamp {
 			highest = reply
 		}
-	}
-
-	if cnt <= aq.q {
-		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
-		return nil, false
 	}
 
 	//TODO Need to return nil, false if not enough correct replies received (not defaultVal)
