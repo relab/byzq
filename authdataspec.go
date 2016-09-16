@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"sync"
 )
 
 // AuthDataQ is the quorum specification for the Authenticated-Data Byzantine quorum
@@ -16,7 +17,7 @@ type AuthDataQ struct {
 	f    int               // tolerable number of failures
 	q    int               // quorum size
 	priv *ecdsa.PrivateKey // my private key for signing
-	pubk *ecdsa.PublicKey  // map of public keys of other writers/signers (clients)
+	pub  *ecdsa.PublicKey  // public key of the writer
 }
 
 // NewAuthDataQ returns a Byzantine masking quorum specification or nil and an error
@@ -30,6 +31,8 @@ func NewAuthDataQ(n int, priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) (*AuthDat
 }
 
 // Sign signs the provided content and returns a value to be passed into Write.
+// (This function must currently be exported since our writer client code is not
+// in the byzq package.)
 func (aq *AuthDataQ) Sign(content *Content) (*Value, error) {
 	msg, err := content.Marshal()
 	if err != nil {
@@ -52,26 +55,15 @@ func (aq *AuthDataQ) verify(reply *Value) bool {
 	msgHash := sha256.Sum256(msg)
 	r := new(big.Int).SetBytes(reply.SignatureR)
 	s := new(big.Int).SetBytes(reply.SignatureS)
-	return ecdsa.Verify(&aq.priv.PublicKey, msgHash[:], r, s)
+	return ecdsa.Verify(aq.pub, msgHash[:], r, s)
 }
 
-func (aq *AuthDataQ) pverify(reply *Value, index int, resultchan chan int) {
-	msg, err := reply.C.Marshal()
-	if err != nil {
-		log.Printf("failed to marshal msg for verify: %v", err)
+func (aq *AuthDataQ) cverify(reply *Value, index int, resultchan chan int) {
+	if aq.verify(reply) {
+		resultchan <- index
+	} else {
 		resultchan <- -1
-		return
 	}
-	msgHash := sha256.Sum256(msg)
-	r := new(big.Int).SetBytes(reply.SignatureR)
-	s := new(big.Int).SetBytes(reply.SignatureS)
-
-	if !ecdsa.Verify(&aq.priv.PublicKey, msgHash[:], r, s) {
-		log.Printf("failed to verify signature for: %v", reply.C)
-		resultchan <- -1
-		return
-	}
-	resultchan <- index
 }
 
 // ReadQF returns nil and false until the supplied replies
@@ -91,18 +83,44 @@ func (aq *AuthDataQ) ReadQF(replies []*Value) (*Value, bool) {
 			highest = reply
 		}
 	}
-
-	// returns reply with the highest timestamp, or nil if not enough
-	// replies were verified
+	// returns reply with the highest timestamp, or nil if no replies were verified
 	return highest, true
 }
 
-func (aq *AuthDataQ) cverify(reply *Value, index int, resultchan chan int) {
-	if aq.verify(reply) {
-		resultchan <- index
-	} else {
-		resultchan <- -1
+// HReadQF returns Hein's QFunc version 1
+func (aq *AuthDataQ) HReadQF(replies []*Value) (*Value, bool) {
+	if len(replies) <= aq.q {
+		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
+		return nil, false
 	}
+	verified := make([]bool, len(replies))
+	wg := &sync.WaitGroup{}
+	for i, reply := range replies {
+		wg.Add(1)
+		go func(i int, r *Value) {
+			verified[i] = aq.verify(r)
+			wg.Done()
+		}(i, reply)
+	}
+	wg.Wait()
+	cnt := 0
+	var highest *Value
+	for i, v := range verified {
+		if !v {
+			// some signature could not be verified:
+			cnt++
+			if len(replies)-cnt <= aq.q {
+				return nil, false
+			}
+		}
+		if highest != nil && replies[i].C.Timestamp <= highest.C.Timestamp {
+			continue
+		}
+		highest = replies[i]
+	}
+
+	// returns reply with the highest timestamp, or nil if no replies were verified
+	return highest, true
 }
 
 // LReadQF returns Leanders QFunc version 1
@@ -123,7 +141,7 @@ func (aq *AuthDataQ) LReadQF(replies []*Value) (*Value, bool) {
 	for j := 0; j < len(replies); j++ {
 		i := <-veriresult
 		if i == -1 {
-			//some signature could not be verified:
+			// some signature could not be verified:
 			cnt++
 			if len(replies)-cnt <= aq.q {
 				return nil, false
@@ -134,53 +152,44 @@ func (aq *AuthDataQ) LReadQF(replies []*Value) (*Value, bool) {
 		}
 		highest = replies[i]
 	}
-
+	// returns reply with the highest timestamp, or nil if no replies were verified
 	return highest, true
 }
 
 // L2ReadQF returns Leanders QFunc version 2
 func (aq *AuthDataQ) L2ReadQF(replies []*Value) (*Value, bool) {
+	if len(replies) < 1 {
+		return nil, false
+	}
 	if !aq.verify(replies[len(replies)-1]) {
-		// Continue if last reply does not verify.
+		// return if last reply failed to verify
 		replies[len(replies)-1] = nil
 		return nil, false
 	}
-
 	if len(replies) <= aq.q {
 		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
 		return nil, false
 	}
 
-	// filter out highest val that appears at least f times
-	//same := make(map[Content]int)
 	var highest *Value
-
 	cntnotnil := 0
 	for _, reply := range replies {
 		if reply == nil {
 			continue
 		}
-		if highest == nil {
-			// only verified replies should be considered as highest
-			highest = reply
-		}
-
 		cntnotnil++
 		// select reply with highest timestamp
-		if reply.C.Timestamp > highest.C.Timestamp {
-			highest = reply
+		if highest != nil && reply.C.Timestamp <= highest.C.Timestamp {
+			continue
 		}
+		highest = reply
 	}
 
 	if cntnotnil <= aq.q {
 		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
 		return nil, false
 	}
-
-	//TODO Need to return nil, false if not enough correct replies received (not defaultVal)
-
-	// returns the reply with the highest timestamp, or if no quorum for
-	// the same timestamp-value pair has been found, the defaultVal is returned.
+	// returns reply with the highest timestamp, or nil if no replies were verified
 	return highest, true
 }
 

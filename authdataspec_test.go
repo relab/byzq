@@ -5,23 +5,21 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 	"strings"
 	"testing"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/grpclog"
 )
 
 // run tests with: go test -v
 
 // run benchmarks: go test -run=$$ -benchmem -benchtime=5s -bench=.
 
-// func TestMain(m *testing.M) {
-// 	silentLogger := log.New(ioutil.Discard, "", log.LstdFlags)
-// 	grpclog.SetLogger(silentLogger)
-// 	grpc.EnableTracing = false
-// 	res := m.Run()
-// 	os.Exit(res)
-// }
-
-var priv, _ = readKeyfile()
+var priv *ecdsa.PrivateKey
 
 var pemKey = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIANyDBAupB6O86ORJ1u95Cz6C+lz3x2WKOFntJNIesvioAoGCCqGSM49
@@ -29,11 +27,22 @@ AwEHoUQDQgAE+pBXRIe0CI3vcdJwSvU37RoTqlPqEve3fcC36f0pY/X9c9CsgkFK
 /sHuBztq9TlUfC0REC81NRqRgs6DTYJ/4Q==
 -----END EC PRIVATE KEY-----`
 
-func readKeyfile() (*ecdsa.PrivateKey, error) {
-	// Crypto (TODO clean up later)
-	// See https://golang.org/src/crypto/tls/generate_cert.go
-	key := new(ecdsa.PrivateKey)
+func TestMain(m *testing.M) {
+	silentLogger := log.New(ioutil.Discard, "", log.LstdFlags)
+	grpclog.SetLogger(silentLogger)
+	grpc.EnableTracing = false
+	var err error
+	priv, err = parseKey()
+	if err != nil {
+		log.Fatalln("couldn't parse private key")
+	}
+	res := m.Run()
+	os.Exit(res)
+}
 
+// parseKey takes a PEM formatted string and returns a private key.
+// See https://golang.org/src/crypto/tls/generate_cert.go
+func parseKey() (*ecdsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(pemKey))
 	if block == nil {
 		return nil, fmt.Errorf("no block to decode")
@@ -275,6 +284,38 @@ func TestAuthDataQ(t *testing.T) {
 				}
 			}
 		})
+
+		t.Run(fmt.Sprintf("L2ReadQF(4,1) %s", test.name), func(t *testing.T) {
+			reply, byzquorum := qspec.L2ReadQF(test.replies)
+			if byzquorum != test.rq {
+				t.Errorf("got %t, want %t", byzquorum, test.rq)
+			}
+			if reply != nil {
+				if !reply.C.Equal(test.expected) {
+					t.Errorf("got %v, want %v as quorum reply", reply.C, test.expected)
+				}
+			} else {
+				if test.expected != nil {
+					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+				}
+			}
+		})
+
+		t.Run(fmt.Sprintf("HReadQF(4,1) %s", test.name), func(t *testing.T) {
+			reply, byzquorum := qspec.HReadQF(test.replies)
+			if byzquorum != test.rq {
+				t.Errorf("got %t, want %t", byzquorum, test.rq)
+			}
+			if reply != nil {
+				if !reply.C.Equal(test.expected) {
+					t.Errorf("got %v, want %v as quorum reply", reply.C, test.expected)
+				}
+			} else {
+				if test.expected != nil {
+					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+				}
+			}
+		})
 	}
 }
 
@@ -309,5 +350,79 @@ func BenchmarkAuthDataQ(b *testing.B) {
 				qspec.LReadQF(test.replies)
 			}
 		})
+
+		b.Run(fmt.Sprintf("L2ReadQF(4,1) %s", test.name), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				qspec.L2ReadQF(test.replies)
+			}
+		})
+
+		b.Run(fmt.Sprintf("HReadQF(4,1) %s", test.name), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				qspec.HReadQF(test.replies)
+			}
+		})
 	}
 }
+
+/*
+var authWriteQFTests = []struct {
+	name     string
+	replies  []*WriteResponse
+	expected *WriteResponse
+	rq       bool
+}{
+	{
+		"nil input",
+		nil,
+		nil,
+		false,
+	},
+	{
+		"len=0 input",
+		[]*WriteResponse{},
+		nil,
+		false,
+	},
+	{
+		"no quorum (I)",
+		[]*WriteResponse{
+
+		},
+		[]*Value{
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+		},
+		nil,
+		false,
+	},
+	{
+		"no quorum (II)",
+		[]*WriteResponse{
+
+		},
+		[]*Value{
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+		},
+		nil,
+		false,
+	},
+	{
+		"quorum (I)",
+		[]*WriteResponse{
+
+		},
+		[]*Value{
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+		},
+		&Content{Key: "Winnie", Value: "Poop", Timestamp: 1},
+		true,
+	},
+}
+*/
