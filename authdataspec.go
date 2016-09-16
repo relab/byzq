@@ -58,14 +58,6 @@ func (aq *AuthDataQ) verify(reply *Value) bool {
 	return ecdsa.Verify(aq.pub, msgHash[:], r, s)
 }
 
-func (aq *AuthDataQ) cverify(reply *Value, index int, resultchan chan int) {
-	if aq.verify(reply) {
-		resultchan <- index
-	} else {
-		resultchan <- -1
-	}
-}
-
 // ReadQF returns nil and false until the supplied replies
 // constitute a Byzantine quorum, at which point the
 // method returns the single highest value and true.
@@ -131,9 +123,13 @@ func (aq *AuthDataQ) LReadQF(replies []*Value) (*Value, bool) {
 	}
 
 	veriresult := make(chan int, len(replies))
-
 	for i, reply := range replies {
-		go aq.cverify(reply, i, veriresult)
+		go func(i int, r *Value) {
+			if !aq.verify(r) {
+				i = -1
+			}
+			veriresult <- i
+		}(i, reply)
 	}
 
 	cnt := 0
