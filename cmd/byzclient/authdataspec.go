@@ -54,12 +54,13 @@ func (aq *AuthDataQ) Sign(content *byzq.Content) (*byzq.Value, error) {
 	return &byzq.Value{C: content, SignatureR: r.Bytes(), SignatureS: s.Bytes()}, nil
 }
 
-func (aq *AuthDataQ) verify(reply *byzq.Value) bool {
+func (aq *AuthDataQ) verify(reply *byzq.Value, index int, resultchan chan int) bool {
 	// TODO add Byzantine behavior by changing return value and detect verify failure.
 	msg, err := reply.C.Marshal()
 	if err != nil {
 		//FIXME log error
 		// dief("failed to marshal msg for verify: %v", err)
+		resultchan <- -1
 		return false
 	}
 	fmt.Println("content = ", reply.C.String())
@@ -76,8 +77,10 @@ func (aq *AuthDataQ) verify(reply *byzq.Value) bool {
 		fmt.Println("msgHash = ", msgHash)
 		fmt.Println("r = ", r)
 		fmt.Println("s = ", s)
+		resultchan <- -1
 		return false
 	}
+	resultchan <- index
 	return true
 }
 
@@ -121,31 +124,15 @@ func (aq *AuthDataQ) LReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
 		return nil, false
 	}
 
-	wg := sync.WaitGroup
-	falsecnt := new(chan bool, len(replies))
-	for _, reply := range replies {
-		wg.Add()
-		go func(atreply **byzq.Value, falsecnt chan bool) {
-			defer wg.Done()
-			if *atreply == nil {
-				falsecnt <- bool
-				return
-			}
-			if !aq.verify(*atreply) {
-				falsecnt <- bool
-			}
-		}(&reply)
+	veriresult := new(chan int, len(replies))
+
+	for i, reply := range replies {
+		go aq.verify(reply,i,veriresult) 
 	}
 
 	cnt := 0
-emptychan_for:
 	for {
-		select {
-		case <-falsecnt:
-			cnt++
-		default:
-			break emptychan_for
-		}
+		i:= <-veriresult:
 	}
 
 	if len(replies)-cnt <= aq.q {
