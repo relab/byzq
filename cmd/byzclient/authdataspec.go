@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/relab/byzq"
 )
@@ -54,13 +53,21 @@ func (aq *AuthDataQ) Sign(content *byzq.Content) (*byzq.Value, error) {
 	return &byzq.Value{C: content, SignatureR: r.Bytes(), SignatureS: s.Bytes()}, nil
 }
 
-func (aq *AuthDataQ) verify(reply *byzq.Value, index int, resultchan chan int) bool {
+
+func (aq *AuthDataQ) cverify(reply *byzq.Value, index int, resultchan chan int) {
+	if aq.verify(reply) {
+		resultchan <- index
+	} else {
+		resultchan <- -1
+	}
+}
+
+func (aq *AuthDataQ) verify(reply *byzq.Value) bool {
 	// TODO add Byzantine behavior by changing return value and detect verify failure.
 	msg, err := reply.C.Marshal()
 	if err != nil {
 		//FIXME log error
 		// dief("failed to marshal msg for verify: %v", err)
-		resultchan <- -1
 		return false
 	}
 	fmt.Println("content = ", reply.C.String())
@@ -77,12 +84,11 @@ func (aq *AuthDataQ) verify(reply *byzq.Value, index int, resultchan chan int) b
 		fmt.Println("msgHash = ", msgHash)
 		fmt.Println("r = ", r)
 		fmt.Println("s = ", s)
-		resultchan <- -1
 		return false
 	}
-	resultchan <- index
 	return true
 }
+
 
 // ReadQF returns nil and false until the supplied replies
 // constitute a Byzantine masking quorum, at which point the
@@ -124,41 +130,29 @@ func (aq *AuthDataQ) LReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
 		return nil, false
 	}
 
-	veriresult := new(chan int, len(replies))
+	veriresult := make(chan int, len(replies))
 
 	for i, reply := range replies {
-		go aq.verify(reply,i,veriresult) 
+		go aq.cverify(reply, i, veriresult)
 	}
 
 	cnt := 0
-	for {
-		i:= <-veriresult:
-	}
-
-	if len(replies)-cnt <= aq.q {
-		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
-		return nil, false
-	}
-
-	// filter out highest val that appears at least f times
-	//same := make(map[byzq.Content]int)
-	highest := &defaultVal
-	wg.Wait()
-
-	for _, reply := range replies {
-		if reply == nil {
+	var highest *byzq.Value
+	for j := 0; j < len(replies); j++ {
+		i := <-veriresult
+		if i == -1 {
+			//some signature could not be verified:
+			cnt++
+			if len(replies)-cnt <= aq.q {
+				return nil, false
+			}
+		}
+		if highest != nil || replies[i].C.Timestamp <= highest.C.Timestamp {
 			continue
 		}
-		// select reply with highest timestamp
-		if reply.C.Timestamp > highest.C.Timestamp {
-			highest = reply
-		}
+		highest = replies[i]
 	}
 
-	//TODO Need to return nil, false if not enough correct replies received (not defaultVal)
-
-	// returns the reply with the highest timestamp, or if no quorum for
-	// the same timestamp-value pair has been found, the defaultVal is returned.
 	return highest, true
 }
 
