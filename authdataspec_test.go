@@ -1,10 +1,12 @@
-package main
+package byzq
 
 import (
+	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
 	"strings"
 	"testing"
-
-	. "github.com/relab/byzq"
 )
 
 // run tests with: go test -v
@@ -18,6 +20,30 @@ import (
 // 	res := m.Run()
 // 	os.Exit(res)
 // }
+
+var priv, _ = readKeyfile()
+
+var pemKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIANyDBAupB6O86ORJ1u95Cz6C+lz3x2WKOFntJNIesvioAoGCCqGSM49
+AwEHoUQDQgAE+pBXRIe0CI3vcdJwSvU37RoTqlPqEve3fcC36f0pY/X9c9CsgkFK
+/sHuBztq9TlUfC0REC81NRqRgs6DTYJ/4Q==
+-----END EC PRIVATE KEY-----`
+
+func readKeyfile() (*ecdsa.PrivateKey, error) {
+	// Crypto (TODO clean up later)
+	// See https://golang.org/src/crypto/tls/generate_cert.go
+	key := new(ecdsa.PrivateKey)
+
+	block, _ := pem.Decode([]byte(pemKey))
+	if block == nil {
+		return nil, fmt.Errorf("no block to decode")
+	}
+	key, err := x509.ParseECPrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse key from pem block: %v\n %v", err, key)
+	}
+	return key, nil
+}
 
 var authQTests = []struct {
 	n   int
@@ -41,7 +67,7 @@ var authQTests = []struct {
 
 func TestAuthDataQ(t *testing.T) {
 	for _, test := range authQTests {
-		bq, err := NewAuthDataQ(test.n)
+		bq, err := NewAuthDataQ(test.n, priv, &priv.PublicKey)
 		if err != nil {
 			if err.Error() != test.err {
 				t.Errorf("got '%v', expected '%v'", err.Error(), test.err)
@@ -91,51 +117,25 @@ var authReadQFTests = []struct {
 		false,
 	},
 	{
-		"no quorum (II)",
+		"no quorum (II) not enough equal replies",
 		[]*Value{
 			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: myVal.C.Value, Timestamp: 1}},
+			&Value{C: &Content{Key: "winnie", Value: "3", Timestamp: 1}},
 			&Value{C: &Content{Key: "winnie", Value: myVal.C.Value, Timestamp: 1}},
 		},
 		nil,
 		false,
 	},
 	{
-		"no quorum (III); default value",
+		"no quorum (III); not enough equal replies",
 		[]*Value{
 			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
 			&Value{C: &Content{Key: "winnie", Value: "3", Timestamp: 1}},
 			&Value{C: &Content{Key: "winnie", Value: "4", Timestamp: 1}},
 			&Value{C: &Content{Key: "winnie", Value: myVal.C.Value, Timestamp: 1}},
 		},
-		&defaultVal,
-		true,
-	},
-	{
-		"no quorum (IV); default value",
-		[]*Value{
-			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: "3", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: myVal.C.Value, Timestamp: 2}},
-			&Value{C: &Content{Key: "winnie", Value: myVal.C.Value, Timestamp: 3}},
-			&Value{C: &Content{Key: "winnie", Value: "4", Timestamp: 1}},
-		},
-		&defaultVal,
-		true,
-	},
-	{
-		//todo: decide if #replies > n should be accepted ?
-		"no quorum (V); default value",
-		[]*Value{
-			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: "3", Timestamp: 2}},
-			&Value{C: &Content{Key: "winnie", Value: myVal.C.Value, Timestamp: 3}},
-			&Value{C: &Content{Key: "winnie", Value: myVal.C.Value, Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 2}},
-			&Value{C: &Content{Key: "winnie", Value: "4", Timestamp: 3}},
-		},
-		&defaultVal,
-		true,
+		nil,
+		false,
 	},
 	{
 		"quorum (I)",
@@ -209,33 +209,45 @@ var authReadQFTests = []struct {
 }
 
 func TestAuthDataReadQF(t *testing.T) {
-	qspec, err := NewByzQ(5)
+	qspec, err := NewAuthDataQ(4, priv, &priv.PublicKey)
 	if err != nil {
 		t.Error(err)
 	}
-	for _, test := range byzReadQFTests {
-		t.Run("ByzQ(5,1)-"+test.name, func(t *testing.T) {
+	for _, test := range authReadQFTests {
+		for i, r := range test.replies {
+			test.replies[i], err = qspec.Sign(r.C)
+			if err != nil {
+				t.Fatal("Failed to sign message")
+			}
+		}
+		t.Run("AuthDataQ(4,1)-"+test.name, func(t *testing.T) {
 			reply, byzquorum := qspec.ReadQF(test.replies)
 			if byzquorum != test.rq {
 				t.Errorf("got %t, want %t", byzquorum, test.rq)
 			}
 			if !reply.Equal(test.expected) {
-				t.Errorf("got %d, want %d as quorum reply", reply, test.expected)
+				t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
 			}
 		})
 	}
 }
 
 func BenchmarkAuthDataReadQF(b *testing.B) {
-	qspec, err := NewByzQ(5)
+	qspec, err := NewAuthDataQ(4, priv, &priv.PublicKey)
 	if err != nil {
 		b.Error(err)
 	}
-	for _, test := range byzReadQFTests {
+	for _, test := range authReadQFTests {
 		if !strings.Contains(test.name, "case") {
 			continue
 		}
-		b.Run("ByzQ(5,1)-"+test.name, func(b *testing.B) {
+		for i, r := range test.replies {
+			test.replies[i], err = qspec.Sign(r.C)
+			if err != nil {
+				b.Fatal("Failed to sign message")
+			}
+		}
+		b.Run("AuthDataQ(4,1)-"+test.name, func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {

@@ -1,4 +1,4 @@
-package main
+package byzq
 
 import (
 	"crypto/ecdsa"
@@ -6,8 +6,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
-
-	"github.com/relab/byzq"
 )
 
 // AuthDataQ todo(doc) does something useful?
@@ -31,7 +29,7 @@ func NewAuthDataQ(n int, priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) (*AuthDat
 
 // PreWrite is invoked before Write()
 // TODO debug why this does not return a Value out (println after calling PreWrite)
-func (aq *AuthDataQ) PreWrite(args byzq.Value) (err error) {
+func (aq *AuthDataQ) PreWrite(args Value) (err error) {
 	a, err := aq.Sign(args.C)
 	args = *a
 	fmt.Println(a.SignatureR)
@@ -39,21 +37,20 @@ func (aq *AuthDataQ) PreWrite(args byzq.Value) (err error) {
 }
 
 // Sign signs the provided content and returns a value to be passed into Write.
-func (aq *AuthDataQ) Sign(content *byzq.Content) (*byzq.Value, error) {
+func (aq *AuthDataQ) Sign(content *Content) (*Value, error) {
 	msg, err := content.Marshal()
 	if err != nil {
 		return nil, err
 	}
 	hash := sha256.Sum256(msg)
-	fmt.Println(hash)
 	r, s, err := ecdsa.Sign(rand.Reader, aq.priv, hash[:])
 	if err != nil {
 		return nil, err
 	}
-	return &byzq.Value{C: content, SignatureR: r.Bytes(), SignatureS: s.Bytes()}, nil
+	return &Value{C: content, SignatureR: r.Bytes(), SignatureS: s.Bytes()}, nil
 }
 
-func (aq *AuthDataQ) verify(reply *byzq.Value) bool {
+func (aq *AuthDataQ) verify(reply *Value) bool {
 	// TODO add Byzantine behavior by changing return value and detect verify failure.
 	msg, err := reply.C.Marshal()
 	if err != nil {
@@ -61,29 +58,18 @@ func (aq *AuthDataQ) verify(reply *byzq.Value) bool {
 		// dief("failed to marshal msg for verify: %v", err)
 		return false
 	}
-	fmt.Println("content = ", reply.C.String())
-	fmt.Println("msg = ", msg)
 	msgHash := sha256.Sum256(msg)
 	r := new(big.Int).SetBytes(reply.SignatureR)
 	s := new(big.Int).SetBytes(reply.SignatureS)
 	// s.Add(s, one) // Byzantine behavior (add 1 to signature field)
 
-	//TODO make this return directly
-	if !ecdsa.Verify(&aq.priv.PublicKey, msgHash[:], r, s) {
-		//FIXME log error
-		fmt.Println("couldn't verify signature: ") // + val.String())
-		fmt.Println("msgHash = ", msgHash)
-		fmt.Println("r = ", r)
-		fmt.Println("s = ", s)
-		return false
-	}
-	return true
+	return ecdsa.Verify(&aq.priv.PublicKey, msgHash[:], r, s)
 }
 
 // ReadQF returns nil and false until the supplied replies
 // constitute a Byzantine masking quorum, at which point the
 // method returns a single state and true.
-func (aq *AuthDataQ) ReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
+func (aq *AuthDataQ) ReadQF(replies []*Value) (*Value, bool) {
 	//TODO could also verify reply in goroutine here and also fire up a collection goroutine that keep track of things
 
 	if len(replies) <= aq.q {
@@ -91,11 +77,12 @@ func (aq *AuthDataQ) ReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
 		return nil, false
 	}
 	// filter out highest val that appears at least f times
-	same := make(map[byzq.Content]int)
-	highest := defaultVal
+	same := make(map[Content]int)
+	highest := *replies[0]
 	for _, reply := range replies {
 		// TODO use goroutines to speed up this verification
 		if aq.verify(reply) {
+			// fmt.Println("verified")
 			same[*reply.C]++
 			// select reply with highest timestamp if it has more than f replies
 			if same[*reply.C] > aq.f && reply.C.Timestamp > highest.C.Timestamp {
@@ -114,7 +101,7 @@ func (aq *AuthDataQ) ReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
 // WriteQF returns nil and false until the supplied replies
 // constitute a Byzantine masking quorum, at which point the
 // method returns a single write response and true.
-func (aq *AuthDataQ) WriteQF(replies []*byzq.WriteResponse) (*byzq.WriteResponse, bool) {
+func (aq *AuthDataQ) WriteQF(replies []*WriteResponse) (*WriteResponse, bool) {
 	if len(replies) <= aq.q {
 		return nil, false
 	}

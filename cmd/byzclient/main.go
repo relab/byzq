@@ -1,9 +1,6 @@
 package main
 
 import (
-	"crypto/ecdsa"
-	"crypto/x509"
-	"encoding/pem"
 	"flag"
 	"fmt"
 	"log"
@@ -61,41 +58,15 @@ func main() {
 	}
 	defer mgr.Close()
 
-	keyFile := "my-key.pem"
-
-	// Crypto (TODO clean up later)
-	// See https://golang.org/src/crypto/tls/generate_cert.go
-	key := new(ecdsa.PrivateKey)
-
-	f, err := os.Open(keyFile)
-	if err != nil {
-		dief("key file not found: %v", err)
-	} else {
-		b := make([]byte, 500)
-		_, err := f.Read(b)
-		if err != nil {
-			f.Close()
-			dief("failed to read key: %v", err)
-		}
-		f.Close()
-		block, _ := pem.Decode(b)
-		if block == nil {
-			dief("no block to decode")
-		}
-		key, err = x509.ParseECPrivateKey(block.Bytes)
-		if err != nil {
-			dief("failed to parse key from pem block: %v\n %v", err, key)
-		}
-	}
-
 	ids := mgr.NodeIDs()
 
+	key := readKeyfile()
 	// var qspec byzq.QuorumSpec
 	var qspec *AuthDataQ
 	switch *protocol {
 	case "byzq":
-		// 	qspec, err = NewByzQ(len(ids))
-		// case "authq":
+		qspec, err = NewByzQ(len(ids))
+	case "authq":
 		qspec, err = NewAuthDataQ(len(ids), key, &key.PublicKey)
 	}
 	if err != nil {
@@ -126,6 +97,7 @@ func main() {
 			// 		dief("failed to sign message: %v", err)
 			// 	}
 			// }
+
 			registerState, err = qspec.Sign(registerState.C)
 			if err != nil {
 				dief("failed to sign message: %v", err)
