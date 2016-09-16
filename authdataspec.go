@@ -10,7 +10,7 @@ import (
 )
 
 // AuthDataQ is the quorum specification for the Authenticated-Data Byzantine quorum
-// algorithm described in TODO
+// algorithm described in RSDP, Algorithm 4.15, page 181.
 type AuthDataQ struct {
 	n    int               // size of system
 	f    int               // tolerable number of failures
@@ -138,56 +138,6 @@ func (aq *AuthDataQ) LReadQF(replies []*Value) (*Value, bool) {
 	return highest, true
 }
 
-// XLReadQF returns Leanders QFunc version 1old
-func (aq *AuthDataQ) XLReadQF(replies []*Value) (*Value, bool) {
-	if len(replies) <= aq.q {
-		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
-		return nil, false
-	}
-
-	veriresult := make(chan int, len(replies))
-	for i, reply := range replies {
-		go aq.pverify(reply, i, veriresult)
-	}
-
-	cnt := 0
-	indicies := make([]int, len(replies))
-	for i := range veriresult {
-		indicies = append(indicies, i)
-		cnt++
-	}
-
-	if len(replies)-cnt <= aq.q {
-		// not enough verified replies yet; need at least bq.q=(n+2f)/2 correct replies
-		return nil, false
-	}
-
-	// filter out highest val that appears at least f times
-	var highest *Value
-	// wg.Wait()
-
-	for _, reply := range replies {
-		if reply == nil {
-			continue
-		}
-		if highest == nil {
-			// only verified replies should be considered as highest
-			highest = reply
-		}
-
-		// select reply with highest timestamp
-		if reply.C.Timestamp > highest.C.Timestamp {
-			highest = reply
-		}
-	}
-
-	//TODO Need to return nil, false if not enough correct replies received (not defaultVal)
-
-	// returns the reply with the highest timestamp, or if no quorum for
-	// the same timestamp-value pair has been found, the defaultVal is returned.
-	return highest, true
-}
-
 // L2ReadQF returns Leanders QFunc version 2
 func (aq *AuthDataQ) L2ReadQF(replies []*Value) (*Value, bool) {
 	if !aq.verify(replies[len(replies)-1]) {
@@ -234,11 +184,21 @@ func (aq *AuthDataQ) L2ReadQF(replies []*Value) (*Value, bool) {
 	return highest, true
 }
 
-// WriteQF returns nil and false until the supplied replies
-// constitute a Byzantine masking quorum, at which point the
-// method returns a single write response and true.
+// WriteQF returns nil and false until it is possible to check for a quorum.
+// If enough replies with the same timestamp is found, we return true.
+//TODO write tests for this method as well
 func (aq *AuthDataQ) WriteQF(replies []*WriteResponse) (*WriteResponse, bool) {
 	if len(replies) <= aq.q {
+		return nil, false
+	}
+	first := replies[0]
+	cnt := 0
+	for i := 1; i < len(replies); i++ {
+		if first.Timestamp == replies[i].Timestamp {
+			cnt++
+		}
+	}
+	if cnt < aq.q {
 		return nil, false
 	}
 	return replies[0], true
