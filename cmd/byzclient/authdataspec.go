@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/relab/byzq"
 )
@@ -109,6 +110,101 @@ func (aq *AuthDataQ) ReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
 	// returns the reply with the highest timestamp, or if no quorum for
 	// the same timestamp-value pair has been found, the defaultVal is returned.
 	return &highest, true
+}
+
+//Leanders version og QFunc
+func (aq *AuthDataQ) LReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
+	//TODO could also verify reply in goroutine here and also fire up a collection goroutine that keep track of things
+
+	if len(replies) <= aq.q {
+		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
+		return nil, false
+	}
+
+	wg := sync.WaitGroup
+	for _, reply := range replies {
+		wg.Add()
+		go func(atreply **byzq.Value) {
+			defer wg.Done()
+			if *atreply == nil {
+				return
+			}
+			if !aq.verify(*atreply) {
+				*atreply = nil
+			}
+		}(&reply)
+	}
+
+	// filter out highest val that appears at least f times
+	//same := make(map[byzq.Content]int)
+	highest := &defaultVal
+	wg.Wait()
+
+	cnt := 0
+	for _, reply := range replies {
+		if reply == nil {
+			continue
+		}
+		cnt++
+		// select reply with highest timestamp
+		if reply.C.Timestamp > highest.C.Timestamp {
+			highest = reply
+		}
+	}
+
+	if cnt <= aq.q {
+		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
+		return nil, false
+	}
+
+	//TODO Need to return nil, false if not enough correct replies received (not defaultVal)
+
+	// returns the reply with the highest timestamp, or if no quorum for
+	// the same timestamp-value pair has been found, the defaultVal is returned.
+	return highest, true
+}
+
+//Leanders version og QFunc Version2
+func (aq *AuthDataQ) L2ReadQF(replies []*byzq.Value) (*byzq.Value, bool) {
+	//TODO could also verify reply in goroutine here and also fire up a collection goroutine that keep track of things
+
+	// Continue if last reply does not verify.
+	if !aq.verify(replies[len(replies)-1]) {
+		replies[len(replies)-1] = nil
+		return nil, false
+	}
+
+	if len(replies) <= aq.q {
+		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
+		return nil, false
+	}
+
+	// filter out highest val that appears at least f times
+	//same := make(map[byzq.Content]int)
+	highest := &defaultVal
+
+	cntnotnil := 0
+	for _, reply := range replies {
+		if reply == nil {
+			continue
+		}
+		cntnotnil++
+		// select reply with highest timestamp
+		if reply.C.Timestamp > highest.C.Timestamp {
+			highest = reply
+		}
+	}
+
+	if cntnotnil <= aq.q {
+		// not enough replies yet; need at least bq.q=(n+2f)/2 replies
+		return nil, false
+	}
+
+	//TODO Need to return nil, false if not enough correct replies received (not defaultVal)
+
+	// returns the reply with the highest timestamp, or if no quorum for
+	// the same timestamp-value pair has been found, the defaultVal is returned.
+	return highest, true
 }
 
 // WriteQF returns nil and false until the supplied replies
