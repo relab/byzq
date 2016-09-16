@@ -666,11 +666,6 @@ type QuorumSpec interface {
 	WriteQF(replies []*WriteResponse) (*WriteResponse, bool)
 }
 
-// PreFn is a test of the pre-write function call used by gorums.
-type PreFn interface {
-	PreWrite(args Value) error
-}
-
 /* Static resources */
 
 /* config.go */

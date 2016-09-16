@@ -62,12 +62,12 @@ func main() {
 
 	key := readKeyfile()
 	// var qspec byzq.QuorumSpec
-	var qspec *AuthDataQ
+	var qspec *byzq.AuthDataQ
 	switch *protocol {
-	case "byzq":
-		qspec, err = NewByzQ(len(ids))
+	// case "byzq":
+	// 	qspec, err = NewByzQ(len(ids))
 	case "authq":
-		qspec, err = NewAuthDataQ(len(ids), key, &key.PublicKey)
+		qspec, err = byzq.NewAuthDataQ(len(ids), key, &key.PublicKey)
 	}
 	if err != nil {
 		dief("%v", err)
@@ -90,14 +90,6 @@ func main() {
 			k := rand.Intn(1 << 8)
 			registerState.C.Value = strconv.Itoa(k)
 			registerState.C.Timestamp++
-
-			// if p, ok := qspec.(byzq.PreFn); ok {
-			// 	err := p.PreWrite(*registerState)
-			// 	if err != nil {
-			// 		dief("failed to sign message: %v", err)
-			// 	}
-			// }
-
 			registerState, err = qspec.Sign(registerState.C)
 			if err != nil {
 				dief("failed to sign message: %v", err)
