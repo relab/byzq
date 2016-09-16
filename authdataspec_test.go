@@ -65,7 +65,7 @@ var authQTests = []struct {
 	{14, 4, 9, ""},
 }
 
-func TestAuthDataQ(t *testing.T) {
+func TestNewAuthDataQ(t *testing.T) {
 	for _, test := range authQTests {
 		bq, err := NewAuthDataQ(test.n, priv, &priv.PublicKey)
 		if err != nil {
@@ -81,7 +81,6 @@ func TestAuthDataQ(t *testing.T) {
 			t.Errorf("got q=%d, expected q=%d", bq.q, test.q)
 		}
 	}
-
 }
 
 var (
@@ -92,7 +91,7 @@ var (
 var authReadQFTests = []struct {
 	name     string
 	replies  []*Value
-	expected *Value
+	expected *Content
 	rq       bool
 }{
 	{
@@ -110,29 +109,16 @@ var authReadQFTests = []struct {
 	{
 		"no quorum (I)",
 		[]*Value{
-			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: myVal.C.Value, Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
 		},
 		nil,
 		false,
 	},
 	{
-		"no quorum (II) not enough equal replies",
+		"no quorum (II)",
 		[]*Value{
-			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: "3", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: myVal.C.Value, Timestamp: 1}},
-		},
-		nil,
-		false,
-	},
-	{
-		"no quorum (III); not enough equal replies",
-		[]*Value{
-			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: "3", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: "4", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: myVal.C.Value, Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
 		},
 		nil,
 		false,
@@ -140,75 +126,112 @@ var authReadQFTests = []struct {
 	{
 		"quorum (I)",
 		[]*Value{
-			myVal,
-			myVal,
-			myVal,
-			myVal,
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
 		},
-		myVal,
+		&Content{Key: "Winnie", Value: "Poop", Timestamp: 1},
 		true,
 	},
 	{
 		"quorum (II)",
 		[]*Value{
-			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
-			myVal,
-			myVal,
-			myVal,
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
 		},
-		myVal,
+		&Content{Key: "Winnie", Value: "Poo", Timestamp: 2},
 		true,
 	},
 	{
 		"quorum (III)",
 		[]*Value{
-			myVal,
-			myVal,
-			myVal,
-			myVal,
-			myVal,
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Pooop", Timestamp: 3}},
 		},
-		myVal,
+		&Content{Key: "Winnie", Value: "Pooop", Timestamp: 3},
 		true,
 	},
 	{
 		"quorum (IV)",
 		[]*Value{
-			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
-			myVal,
-			myVal,
-			myVal,
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Pooop", Timestamp: 3}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poooop", Timestamp: 4}},
 		},
-		myVal,
+		&Content{Key: "Winnie", Value: "Poooop", Timestamp: 4},
 		true,
 	},
 	{
-		"base-case quorum",
+		"quorum (V)",
 		[]*Value{
 			myVal,
 			myVal,
 			myVal,
 			myVal,
 		},
-		myVal,
+		myContent,
 		true,
 	},
 	{
-		"approx. worst-case quorum",
+		"quorum (VI)",
 		[]*Value{
-			&Value{C: &Content{Key: "winnie", Value: "2", Timestamp: 1}},
-			&Value{C: &Content{Key: "winnie", Value: "4", Timestamp: 2}},
-			&Value{C: &Content{Key: "winnie", Value: "5", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			myVal,
 			myVal,
 			myVal,
 		},
-		myVal,
+		myContent,
+		true,
+	},
+	{
+		"quorum (VII)",
+		[]*Value{
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			myVal,
+			myVal,
+		},
+		myContent,
+		true,
+	},
+	{
+		"quorum (VIII)",
+		[]*Value{
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			myVal,
+		},
+		myContent,
+		true,
+	},
+	{
+		"bast-case quorum",
+		[]*Value{
+			myVal,
+			myVal,
+			myVal,
+		},
+		myContent,
+		true,
+	},
+	{
+		"worst-case quorum",
+		[]*Value{
+			myVal,
+			myVal,
+			myVal,
+			myVal,
+		},
+		myContent,
 		true,
 	},
 }
 
-func TestAuthDataReadQF(t *testing.T) {
+func TestAuthDataQ(t *testing.T) {
 	qspec, err := NewAuthDataQ(4, priv, &priv.PublicKey)
 	if err != nil {
 		t.Error(err)
@@ -220,19 +243,42 @@ func TestAuthDataReadQF(t *testing.T) {
 				t.Fatal("Failed to sign message")
 			}
 		}
-		t.Run("AuthDataQ(4,1)-"+test.name, func(t *testing.T) {
+
+		t.Run(fmt.Sprintf("ReadQF(4,1) %s", test.name), func(t *testing.T) {
 			reply, byzquorum := qspec.ReadQF(test.replies)
 			if byzquorum != test.rq {
 				t.Errorf("got %t, want %t", byzquorum, test.rq)
 			}
-			if !reply.Equal(test.expected) {
-				t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+			if reply != nil {
+				if !reply.C.Equal(test.expected) {
+					t.Errorf("got %v, want %v as quorum reply", reply.C, test.expected)
+				}
+			} else {
+				if test.expected != nil {
+					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+				}
+			}
+		})
+
+		t.Run(fmt.Sprintf("LReadQF(4,1) %s", test.name), func(t *testing.T) {
+			reply, byzquorum := qspec.LReadQF(test.replies)
+			if byzquorum != test.rq {
+				t.Errorf("got %t, want %t", byzquorum, test.rq)
+			}
+			if reply != nil {
+				if !reply.C.Equal(test.expected) {
+					t.Errorf("got %v, want %v as quorum reply", reply.C, test.expected)
+				}
+			} else {
+				if test.expected != nil {
+					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+				}
 			}
 		})
 	}
 }
 
-func BenchmarkAuthDataReadQF(b *testing.B) {
+func BenchmarkAuthDataQ(b *testing.B) {
 	qspec, err := NewAuthDataQ(4, priv, &priv.PublicKey)
 	if err != nil {
 		b.Error(err)
@@ -247,11 +293,20 @@ func BenchmarkAuthDataReadQF(b *testing.B) {
 				b.Fatal("Failed to sign message")
 			}
 		}
-		b.Run("AuthDataQ(4,1)-"+test.name, func(b *testing.B) {
+
+		b.Run(fmt.Sprintf("ReadQF(4,1) %s", test.name), func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				qspec.ReadQF(test.replies)
+			}
+		})
+
+		b.Run(fmt.Sprintf("LReadQF(4,1) %s", test.name), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				qspec.LReadQF(test.replies)
 			}
 		})
 	}
