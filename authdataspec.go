@@ -16,8 +16,9 @@ type AuthDataQ struct {
 	n    int               // size of system
 	f    int               // tolerable number of failures
 	q    int               // quorum size
-	priv *ecdsa.PrivateKey // my private key for signing
-	pub  *ecdsa.PublicKey  // public key of the writer
+	priv *ecdsa.PrivateKey // writer's private key for signing
+	pub  *ecdsa.PublicKey  // public key of the writer (used by readers)
+	wts  int64             // writer's timestamp
 }
 
 // NewAuthDataQ returns a Byzantine masking quorum specification or nil and an error
@@ -27,7 +28,7 @@ func NewAuthDataQ(n int, priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) (*AuthDat
 	if f < 1 {
 		return nil, fmt.Errorf("Byzantine quorum require n>3f replicas; only got n=%d, yielding f=%d", n, f)
 	}
-	return &AuthDataQ{n, f, (n + f) / 2, priv, pub}, nil
+	return &AuthDataQ{n, f, (n + f) / 2, priv, pub, 0}, nil
 }
 
 // Sign signs the provided content and returns a value to be passed into Write.
@@ -192,20 +193,19 @@ func (aq *AuthDataQ) L2ReadQF(replies []*Value) (*Value, bool) {
 // WriteQF returns nil and false until it is possible to check for a quorum.
 // If enough replies with the same timestamp is found, we return true.
 func (aq *AuthDataQ) WriteQF(replies []*WriteResponse) (*WriteResponse, bool) {
-	// TODO this method does not work as it should; the writer's Write call should decide the wts,
-	// and the WriteResponses needs be the same as wts
 	if len(replies) <= aq.q {
 		return nil, false
 	}
-	wts := replies[0].Timestamp
 	cnt := 0
-	for i := 1; i < len(replies); i++ {
-		if wts == replies[i].Timestamp {
+	var reply *WriteResponse
+	for _, r := range replies {
+		if aq.wts == r.Timestamp {
 			cnt++
+			reply = r
 		}
 	}
 	if cnt < aq.q {
 		return nil, false
 	}
-	return replies[0], true
+	return reply, true
 }

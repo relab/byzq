@@ -461,6 +461,17 @@ var authWriteQFTests = []struct {
 		true,
 	},
 	{
+		"quorum (IV)",
+		[]*WriteResponse{
+			&WriteResponse{Timestamp: 2},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+		},
+		&WriteResponse{Timestamp: 1},
+		true,
+	},
+	{
 		"best-case quorum",
 		[]*WriteResponse{
 			&WriteResponse{Timestamp: 1},
@@ -490,6 +501,10 @@ func TestAuthDataQW(t *testing.T) {
 	}
 	for _, test := range authWriteQFTests {
 		t.Run(fmt.Sprintf("WriteQF(4,1) %s", test.name), func(t *testing.T) {
+			if test.expected != nil {
+				// initialize write timestamp to expected value
+				qspec.wts = test.expected.Timestamp
+			}
 			reply, byzquorum := qspec.WriteQF(test.replies)
 			if byzquorum != test.rq {
 				t.Errorf("got %t, want %t", byzquorum, test.rq)
