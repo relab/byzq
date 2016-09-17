@@ -31,6 +31,12 @@ func NewAuthDataQ(n int, priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) (*AuthDat
 	return &AuthDataQ{n, f, (n + f) / 2, priv, pub, 0}, nil
 }
 
+// IncWTS updates and returns the writer's timestamp wts. This is not thread safe.
+func (aq *AuthDataQ) IncWTS() int64 {
+	aq.wts++
+	return aq.wts
+}
+
 // Sign signs the provided content and returns a value to be passed into Write.
 // (This function must currently be exported since our writer client code is not
 // in the byzq package.)

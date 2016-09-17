@@ -77,43 +77,35 @@ func main() {
 		dief("error creating config: %v", err)
 	}
 
-	content := &byzq.Content{
+	registerState := &byzq.Content{
 		Key:       "Hein",
 		Value:     "Meling",
 		Timestamp: -1,
 	}
 
-	registerState := &byzq.Value{C: content}
 	for {
 		if *writer {
 			// Writer client
-			k := rand.Intn(1 << 8)
-			registerState.C.Value = strconv.Itoa(k)
-			registerState.C.Timestamp++
-			registerState, err = qspec.Sign(registerState.C)
+			registerState.Value = strconv.Itoa(rand.Intn(1 << 8))
+			registerState.Timestamp = qspec.IncWTS()
+			signedState, err := qspec.Sign(registerState)
 			if err != nil {
 				dief("failed to sign message: %v", err)
 			}
-			ack, err := conf.Write(registerState)
+			ack, err := conf.Write(signedState)
 			if err != nil {
 				dief("error writing: %v", err)
 			}
-			// fmt.Println("w " + ack.Reply.String())
-			if ack.Reply.Timestamp > registerState.C.Timestamp {
-				registerState.C.Timestamp = ack.Reply.Timestamp
-			}
+			fmt.Println("WriteReturn " + ack.Reply.String())
 			time.Sleep(100 * time.Second)
 		} else {
 			// Reader client
-			val, err := conf.Read(&byzq.Key{Key: content.Key})
+			val, err := conf.Read(&byzq.Key{Key: registerState.Key})
 			if err != nil {
 				dief("error reading: %v", err)
 			}
-			if val.Reply.C.Timestamp > registerState.C.Timestamp {
-				registerState.C.Timestamp = val.Reply.C.Timestamp
-			}
-			registerState = val.Reply
-			// fmt.Println("read: " + registerState.String())
+			registerState = val.Reply.C
+			fmt.Println("ReadReturn: " + registerState.String())
 			time.Sleep(10000 * time.Millisecond)
 		}
 	}
