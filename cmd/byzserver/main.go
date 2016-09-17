@@ -33,7 +33,7 @@ func main() {
 	flag.Parse()
 
 	if *f > 0 {
-		// we are running only local since we have asked for more than f servers
+		// we are running only local since we have asked for 3f+1 servers
 		done := make(chan bool)
 		n := 3**f + 1
 		for i := 0; i < n; i++ {
