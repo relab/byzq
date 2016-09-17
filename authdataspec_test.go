@@ -2,8 +2,6 @@ package byzq
 
 import (
 	"crypto/ecdsa"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -23,7 +21,7 @@ import (
 
 var priv *ecdsa.PrivateKey
 
-var pemKey = `-----BEGIN EC PRIVATE KEY-----
+var pemKeyData = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIANyDBAupB6O86ORJ1u95Cz6C+lz3x2WKOFntJNIesvioAoGCCqGSM49
 AwEHoUQDQgAE+pBXRIe0CI3vcdJwSvU37RoTqlPqEve3fcC36f0pY/X9c9CsgkFK
 /sHuBztq9TlUfC0REC81NRqRgs6DTYJ/4Q==
@@ -34,26 +32,12 @@ func TestMain(m *testing.M) {
 	grpclog.SetLogger(silentLogger)
 	grpc.EnableTracing = false
 	var err error
-	priv, err = parseKey()
+	priv, err = ParseKey(pemKeyData)
 	if err != nil {
 		log.Fatalln("couldn't parse private key")
 	}
 	res := m.Run()
 	os.Exit(res)
-}
-
-// parseKey takes a PEM formatted string and returns a private key.
-// See https://golang.org/src/crypto/tls/generate_cert.go
-func parseKey() (*ecdsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(pemKey))
-	if block == nil {
-		return nil, fmt.Errorf("no block to decode")
-	}
-	key, err := x509.ParseECPrivateKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse key from pem block: %v\n %v", err, key)
-	}
-	return key, nil
 }
 
 var authQTests = []struct {

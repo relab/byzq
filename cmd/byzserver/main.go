@@ -21,8 +21,9 @@ type register struct {
 }
 
 func main() {
-	port := flag.String("port", "8080", "port to listen on")
-	key := flag.String("key", "", "name of public/private key files (must share same prefix)")
+	port := flag.Int("port", 8080, "port to listen on")
+	f := flag.Int("f", 0, "fault tolerance, supported values f=1,2,3 (this is ignored if addrs is provided)")
+	key := flag.String("key", "", "public/private key file this server")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n", os.Args[0])
@@ -31,15 +32,30 @@ func main() {
 	}
 	flag.Parse()
 
-	l, err := net.Listen("tcp", fmt.Sprintf(":%s", *port))
+	if *f > 0 {
+		// we are running only local since we have asked for more than f servers
+		done := make(chan bool)
+		n := 3**f + 1
+		for i := 0; i < n; i++ {
+			go serve(*port+i, *key)
+		}
+		// wait indefinitely
+		<-done
+	}
+	// run only one server
+	serve(*port, *key)
+}
+
+func serve(port int, keyFile string) {
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	defer l.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	if *key == "" {
+	if keyFile == "" {
 		log.Fatalln("required server keys not provided")
 	}
-	creds, err := credentials.NewServerTLSFromFile(*key+".pem", *key+".key")
+	creds, err := credentials.NewServerTLSFromFile(keyFile+".pem", keyFile+".key")
 	if err != nil {
 		log.Fatalf("failed to load credentials %v", err)
 	}
@@ -47,6 +63,7 @@ func main() {
 	grpcServer := grpc.NewServer(opts...)
 	smap := make(map[string]byzq.Value)
 	byzq.RegisterRegisterServer(grpcServer, &register{state: smap})
+	log.Printf("Server %s running", l.Addr())
 	log.Fatal(grpcServer.Serve(l))
 }
 

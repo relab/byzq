@@ -1,10 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
-	"math/big"
 	"math/rand"
 	"os"
 	"strconv"
@@ -17,14 +17,13 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-const localAddrs = ":8080,:8081,:8082,:8083,:8084"
-
-var one = new(big.Int).SetInt64(1)
-
 func main() {
-	saddrs := flag.String("addrs", localAddrs, "server addresses separated by ','")
+	port := flag.Int("port", 8080, "port where local server is listening")
+	saddrs := flag.String("addrs", "", "server addresses separated by ','")
+	f := flag.Int("f", 1, "fault tolerance, supported values f=1,2,3 (this is ignored if addrs is provided)")
+	generate := flag.Bool("generate", false, "generate public/private key-pair and save to file provided by -key")
 	writer := flag.Bool("writer", false, "set this client to be writer only (default is reader only)")
-	protocol := flag.String("protocol", "byzq", "protocol to use in the experiment (options: byzq, authq)")
+	keyFile := flag.String("key", "priv-key.pem", "private key file to be used for signatures")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n", os.Args[0])
@@ -33,16 +32,46 @@ func main() {
 	}
 	flag.Parse()
 
+	if *generate {
+		// generate key file and exit
+		err := byzq.GenerateKeyfile(*keyFile)
+		if err != nil {
+			dief("error generating public/private key-pair: %v", err)
+		}
+		os.Exit(0)
+	}
+
+	if *saddrs == "" {
+		// use local addresses only
+		if *f > 3 || *f < 1 {
+			dief("only f=1,2,3 is allowed")
+		}
+		n := 3**f + 1
+		var buf bytes.Buffer
+		for i := 0; i < n; i++ {
+			buf.WriteString(":")
+			buf.WriteString(strconv.Itoa(*port + i))
+			buf.WriteString(",")
+		}
+		b := buf.String()
+		*saddrs = b[:len(b)-1]
+	}
+
 	addrs := strings.Split(*saddrs, ",")
 	if len(addrs) == 0 {
 		dief("no server addresses provided")
 	}
-	log.Println("#addrs:", len(addrs))
+	log.Printf("#addrs: %d (%v)", len(addrs), *saddrs)
 
 	//TODO fix hardcoded youtube server name (can we get certificate for localhost servername?)
 	clientCreds, err := credentials.NewClientTLSFromFile("cert/ca.pem", "x.test.youtube.com")
 	if err != nil {
 		dief("error creating credentials: %v", err)
+	}
+
+	key, err := byzq.ReadKeyfile(*keyFile)
+	if err != nil {
+		dief("error reading keyfile: %v", err)
 	}
 
 	mgr, err := byzq.NewManager(
@@ -59,18 +88,9 @@ func main() {
 	defer mgr.Close()
 
 	ids := mgr.NodeIDs()
-
-	key := readKeyfile()
-	// var qspec byzq.QuorumSpec
-	var qspec *byzq.AuthDataQ
-	switch *protocol {
-	// case "byzq":
-	// 	qspec, err = NewByzQ(len(ids))
-	case "authq":
-		qspec, err = byzq.NewAuthDataQ(len(ids), key, &key.PublicKey)
-	}
+	qspec, err := byzq.NewAuthDataQ(len(ids), key, &key.PublicKey)
 	if err != nil {
-		dief("%v", err)
+		dief("error creating quorum specification: %v", err)
 	}
 	conf, err := mgr.NewConfiguration(ids, qspec, time.Second)
 	if err != nil {

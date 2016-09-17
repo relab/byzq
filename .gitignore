@@ -28,6 +28,6 @@ cmd/byzserver/byzserver
 cmd/byzclient/byzclient
 
 # key files
-my-key.pem
+priv-key.pem
 
 
