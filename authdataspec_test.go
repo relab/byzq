@@ -19,6 +19,8 @@ import (
 
 // run benchmarks: go test -run=$$ -benchmem -benchtime=5s -bench=.
 
+// TODO Make tests for f=2 and f=3
+
 var priv *ecdsa.PrivateKey
 
 var pemKey = `-----BEGIN EC PRIVATE KEY-----
@@ -369,7 +371,6 @@ func BenchmarkAuthDataQ(b *testing.B) {
 	}
 }
 
-/*
 var authWriteQFTests = []struct {
 	name     string
 	replies  []*WriteResponse
@@ -391,10 +392,7 @@ var authWriteQFTests = []struct {
 	{
 		"no quorum (I)",
 		[]*WriteResponse{
-
-		},
-		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			&WriteResponse{Timestamp: 1},
 		},
 		nil,
 		false,
@@ -402,11 +400,30 @@ var authWriteQFTests = []struct {
 	{
 		"no quorum (II)",
 		[]*WriteResponse{
-
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
 		},
-		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+		nil,
+		false,
+	},
+	{
+		"no quorum (III)",
+		[]*WriteResponse{
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 2},
+			&WriteResponse{Timestamp: 3},
+			&WriteResponse{Timestamp: 4},
+		},
+		nil,
+		false,
+	},
+	{
+		"no quorum (IV)",
+		[]*WriteResponse{
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 2},
+			&WriteResponse{Timestamp: 2},
 		},
 		nil,
 		false,
@@ -414,15 +431,91 @@ var authWriteQFTests = []struct {
 	{
 		"quorum (I)",
 		[]*WriteResponse{
-
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
 		},
-		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+		&WriteResponse{Timestamp: 1},
+		true,
+	},
+	{
+		"quorum (II)",
+		[]*WriteResponse{
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
 		},
-		&Content{Key: "Winnie", Value: "Poop", Timestamp: 1},
+		&WriteResponse{Timestamp: 1},
+		true,
+	},
+	{
+		"quorum (III)",
+		[]*WriteResponse{
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 2},
+		},
+		&WriteResponse{Timestamp: 1},
+		true,
+	},
+	{
+		"best-case quorum",
+		[]*WriteResponse{
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+		},
+		&WriteResponse{Timestamp: 1},
+		true,
+	},
+	{
+		"worst-case quorum",
+		[]*WriteResponse{
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+			&WriteResponse{Timestamp: 1},
+		},
+		&WriteResponse{Timestamp: 1},
 		true,
 	},
 }
-*/
+
+func TestAuthDataQW(t *testing.T) {
+	qspec, err := NewAuthDataQ(4, priv, &priv.PublicKey)
+	if err != nil {
+		t.Error(err)
+	}
+	for _, test := range authWriteQFTests {
+		t.Run(fmt.Sprintf("WriteQF(4,1) %s", test.name), func(t *testing.T) {
+			reply, byzquorum := qspec.WriteQF(test.replies)
+			if byzquorum != test.rq {
+				t.Errorf("got %t, want %t", byzquorum, test.rq)
+			}
+			if !reply.Equal(test.expected) {
+				t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+			}
+		})
+	}
+}
+
+func BenchmarkAuthDataQW(b *testing.B) {
+	qspec, err := NewAuthDataQ(4, priv, &priv.PublicKey)
+	if err != nil {
+		b.Error(err)
+	}
+	for _, test := range authWriteQFTests {
+		if !strings.Contains(test.name, "case") {
+			continue
+		}
+		b.Run(fmt.Sprintf("WriteQF(4,1) %s", test.name), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				qspec.WriteQF(test.replies)
+			}
+		})
+	}
+}

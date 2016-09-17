@@ -191,15 +191,15 @@ func (aq *AuthDataQ) L2ReadQF(replies []*Value) (*Value, bool) {
 
 // WriteQF returns nil and false until it is possible to check for a quorum.
 // If enough replies with the same timestamp is found, we return true.
-//TODO write tests for this method as well
-//TODO this method does not work as it should; the writer's Write call decides the wts, and the WriteResponse needs be the same as wts
 func (aq *AuthDataQ) WriteQF(replies []*WriteResponse) (*WriteResponse, bool) {
+	// TODO this method does not work as it should; the writer's Write call should decide the wts,
+	// and the WriteResponses needs be the same as wts
 	if len(replies) <= aq.q {
 		return nil, false
 	}
-	wts := int64(0)
+	wts := replies[0].Timestamp
 	cnt := 0
-	for i := 0; i < len(replies); i++ {
+	for i := 1; i < len(replies); i++ {
 		if wts == replies[i].Timestamp {
 			cnt++
 		}
