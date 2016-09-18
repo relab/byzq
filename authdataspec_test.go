@@ -325,7 +325,9 @@ func BenchmarkAuthDataQ(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				qspec.ReadQF(test.replies)
+				for j := 1 ; j <= len(test.replies); j++ {
+					qspec.ReadQF(test.replies[:j])
+				}
 			}
 		})
 
@@ -333,7 +335,9 @@ func BenchmarkAuthDataQ(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				qspec.LReadQF(test.replies)
+				for j := 1 ; j <= len(test.replies); j++ {
+					qspec.LReadQF(test.replies[:j])
+				}
 			}
 		})
 
@@ -341,7 +345,9 @@ func BenchmarkAuthDataQ(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				qspec.L2ReadQF(test.replies)
+				for j := 1 ; j <= len(test.replies); j++ {
+					qspec.L2ReadQF(test.replies[:j])
+				}
 			}
 		})
 
@@ -349,7 +355,9 @@ func BenchmarkAuthDataQ(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				qspec.HReadQF(test.replies)
+				for j := 1 ; j <= len(test.replies); j++ {
+					qspec.HReadQF(test.replies[:j])
+				}
 			}
 		})
 	}
