@@ -19,6 +19,8 @@ package byzq
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
+import _ "github.com/relab/gorums"
+import _ "github.com/gogo/protobuf/gogoproto"
 
 import bytes "bytes"
 
@@ -31,7 +33,10 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/trace"
+
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 import (
@@ -64,6 +69,13 @@ func (m *Key) Reset()                    { *m = Key{} }
 func (*Key) ProtoMessage()               {}
 func (*Key) Descriptor() ([]byte, []int) { return fileDescriptorByzq, []int{0} }
 
+func (m *Key) GetKey() string {
+	if m != nil {
+		return m.Key
+	}
+	return ""
+}
+
 type Content struct {
 	Key       string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Timestamp int64  `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
@@ -73,6 +85,27 @@ type Content struct {
 func (m *Content) Reset()                    { *m = Content{} }
 func (*Content) ProtoMessage()               {}
 func (*Content) Descriptor() ([]byte, []int) { return fileDescriptorByzq, []int{1} }
+
+func (m *Content) GetKey() string {
+	if m != nil {
+		return m.Key
+	}
+	return ""
+}
+
+func (m *Content) GetTimestamp() int64 {
+	if m != nil {
+		return m.Timestamp
+	}
+	return 0
+}
+
+func (m *Content) GetValue() string {
+	if m != nil {
+		return m.Value
+	}
+	return ""
+}
 
 // [Value, requestID, ts, val, signature]
 // [Write, wts, val, signature]
@@ -93,6 +126,20 @@ func (m *Value) GetC() *Content {
 	return nil
 }
 
+func (m *Value) GetSignatureR() []byte {
+	if m != nil {
+		return m.SignatureR
+	}
+	return nil
+}
+
+func (m *Value) GetSignatureS() []byte {
+	if m != nil {
+		return m.SignatureS
+	}
+	return nil
+}
+
 // [Ack, ts]
 type WriteResponse struct {
 	Timestamp int64 `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
@@ -102,41 +149,18 @@ func (m *WriteResponse) Reset()                    { *m = WriteResponse{} }
 func (*WriteResponse) ProtoMessage()               {}
 func (*WriteResponse) Descriptor() ([]byte, []int) { return fileDescriptorByzq, []int{3} }
 
+func (m *WriteResponse) GetTimestamp() int64 {
+	if m != nil {
+		return m.Timestamp
+	}
+	return 0
+}
+
 func init() {
 	proto.RegisterType((*Key)(nil), "byzq.Key")
 	proto.RegisterType((*Content)(nil), "byzq.Content")
 	proto.RegisterType((*Value)(nil), "byzq.Value")
 	proto.RegisterType((*WriteResponse)(nil), "byzq.WriteResponse")
-}
-func (this *Key) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*Key)
-	if !ok {
-		that2, ok := that.(Key)
-		if ok {
-			that1 = &that2
-		} else {
-			return fmt.Errorf("that is not of type *Key")
-		}
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt.Errorf("that is type *Key but is nil && this != nil")
-	} else if this == nil {
-		return fmt.Errorf("that is type *Key but is not nil && this == nil")
-	}
-	if this.Key != that1.Key {
-		return fmt.Errorf("Key this(%v) Not Equal that(%v)", this.Key, that1.Key)
-	}
-	return nil
 }
 func (this *Key) Equal(that interface{}) bool {
 	if that == nil {
@@ -167,42 +191,6 @@ func (this *Key) Equal(that interface{}) bool {
 		return false
 	}
 	return true
-}
-func (this *Content) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*Content)
-	if !ok {
-		that2, ok := that.(Content)
-		if ok {
-			that1 = &that2
-		} else {
-			return fmt.Errorf("that is not of type *Content")
-		}
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt.Errorf("that is type *Content but is nil && this != nil")
-	} else if this == nil {
-		return fmt.Errorf("that is type *Content but is not nil && this == nil")
-	}
-	if this.Key != that1.Key {
-		return fmt.Errorf("Key this(%v) Not Equal that(%v)", this.Key, that1.Key)
-	}
-	if this.Timestamp != that1.Timestamp {
-		return fmt.Errorf("Timestamp this(%v) Not Equal that(%v)", this.Timestamp, that1.Timestamp)
-	}
-	if this.Value != that1.Value {
-		return fmt.Errorf("Value this(%v) Not Equal that(%v)", this.Value, that1.Value)
-	}
-	return nil
 }
 func (this *Content) Equal(that interface{}) bool {
 	if that == nil {
@@ -240,42 +228,6 @@ func (this *Content) Equal(that interface{}) bool {
 	}
 	return true
 }
-func (this *Value) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*Value)
-	if !ok {
-		that2, ok := that.(Value)
-		if ok {
-			that1 = &that2
-		} else {
-			return fmt.Errorf("that is not of type *Value")
-		}
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt.Errorf("that is type *Value but is nil && this != nil")
-	} else if this == nil {
-		return fmt.Errorf("that is type *Value but is not nil && this == nil")
-	}
-	if !this.C.Equal(that1.C) {
-		return fmt.Errorf("C this(%v) Not Equal that(%v)", this.C, that1.C)
-	}
-	if !bytes.Equal(this.SignatureR, that1.SignatureR) {
-		return fmt.Errorf("SignatureR this(%v) Not Equal that(%v)", this.SignatureR, that1.SignatureR)
-	}
-	if !bytes.Equal(this.SignatureS, that1.SignatureS) {
-		return fmt.Errorf("SignatureS this(%v) Not Equal that(%v)", this.SignatureS, that1.SignatureS)
-	}
-	return nil
-}
 func (this *Value) Equal(that interface{}) bool {
 	if that == nil {
 		if this == nil {
@@ -312,36 +264,6 @@ func (this *Value) Equal(that interface{}) bool {
 	}
 	return true
 }
-func (this *WriteResponse) VerboseEqual(that interface{}) error {
-	if that == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt.Errorf("that == nil && this != nil")
-	}
-
-	that1, ok := that.(*WriteResponse)
-	if !ok {
-		that2, ok := that.(WriteResponse)
-		if ok {
-			that1 = &that2
-		} else {
-			return fmt.Errorf("that is not of type *WriteResponse")
-		}
-	}
-	if that1 == nil {
-		if this == nil {
-			return nil
-		}
-		return fmt.Errorf("that is type *WriteResponse but is nil && this != nil")
-	} else if this == nil {
-		return fmt.Errorf("that is type *WriteResponse but is not nil && this == nil")
-	}
-	if this.Timestamp != that1.Timestamp {
-		return fmt.Errorf("Timestamp this(%v) Not Equal that(%v)", this.Timestamp, that1.Timestamp)
-	}
-	return nil
-}
 func (this *WriteResponse) Equal(that interface{}) bool {
 	if that == nil {
 		if this == nil {
@@ -373,119 +295,28 @@ func (this *WriteResponse) Equal(that interface{}) bool {
 	return true
 }
 
-/* 'gorums' plugin for protoc-gen-go - generated from: config_rpc_tmpl */
+//  Reference Gorums specific imports to suppress errors if they are not otherwise used.
+var _ = codes.OK
 
-// ReadReply encapsulates the reply from a Read RPC invocation.
-// It contains the id of each node in the quorum that replied and a single
-// reply.
-type ReadReply struct {
-	NodeIDs []uint32
-	Reply   *Value
+/* 'gorums' plugin for protoc-gen-go - generated from: calltype_correctable_prelim_tmpl */
+
+/* 'gorums' plugin for protoc-gen-go - generated from: calltype_correctable_tmpl */
+
+/* 'gorums' plugin for protoc-gen-go - generated from: calltype_future_tmpl */
+
+/* 'gorums' plugin for protoc-gen-go - generated from: calltype_multicast_tmpl */
+
+/* 'gorums' plugin for protoc-gen-go - generated from: calltype_quorumcall_tmpl */
+
+/* Exported types and methods for quorum call method Read */
+
+// Read is invoked as a quorum call on all nodes in configuration c,
+// using the same argument arg, and returns the result.
+func (c *Configuration) Read(ctx context.Context, arg *Key) (*Content, error) {
+	return c.read(ctx, arg)
 }
 
-func (r ReadReply) String() string {
-	return fmt.Sprintf("node ids: %v | answer: %v", r.NodeIDs, r.Reply)
-}
-
-// Read invokes a Read RPC on configuration c
-// and returns the result as a ReadReply.
-func (c *Configuration) Read(args *Key) (*ReadReply, error) {
-	return c.mgr.read(c, args)
-}
-
-// ReadFuture is a reference to an asynchronous Read RPC invocation.
-type ReadFuture struct {
-	reply *ReadReply
-	err   error
-	c     chan struct{}
-}
-
-// ReadFuture asynchronously invokes a Read RPC on configuration c and
-// returns a ReadFuture which can be used to inspect the RPC reply and error
-// when available.
-func (c *Configuration) ReadFuture(args *Key) *ReadFuture {
-	f := new(ReadFuture)
-	f.c = make(chan struct{}, 1)
-	go func() {
-		defer close(f.c)
-		f.reply, f.err = c.mgr.read(c, args)
-	}()
-	return f
-}
-
-// Get returns the reply and any error associated with the ReadFuture.
-// The method blocks until a reply or error is available.
-func (f *ReadFuture) Get() (*ReadReply, error) {
-	<-f.c
-	return f.reply, f.err
-}
-
-// Done reports if a reply or error is available for the ReadFuture.
-func (f *ReadFuture) Done() bool {
-	select {
-	case <-f.c:
-		return true
-	default:
-		return false
-	}
-}
-
-// WriteReply encapsulates the reply from a Write RPC invocation.
-// It contains the id of each node in the quorum that replied and a single
-// reply.
-type WriteReply struct {
-	NodeIDs []uint32
-	Reply   *WriteResponse
-}
-
-func (r WriteReply) String() string {
-	return fmt.Sprintf("node ids: %v | answer: %v", r.NodeIDs, r.Reply)
-}
-
-// Write invokes a Write RPC on configuration c
-// and returns the result as a WriteReply.
-func (c *Configuration) Write(args *Value) (*WriteReply, error) {
-	return c.mgr.write(c, args)
-}
-
-// WriteFuture is a reference to an asynchronous Write RPC invocation.
-type WriteFuture struct {
-	reply *WriteReply
-	err   error
-	c     chan struct{}
-}
-
-// WriteFuture asynchronously invokes a Write RPC on configuration c and
-// returns a WriteFuture which can be used to inspect the RPC reply and error
-// when available.
-func (c *Configuration) WriteFuture(args *Value) *WriteFuture {
-	f := new(WriteFuture)
-	f.c = make(chan struct{}, 1)
-	go func() {
-		defer close(f.c)
-		f.reply, f.err = c.mgr.write(c, args)
-	}()
-	return f
-}
-
-// Get returns the reply and any error associated with the WriteFuture.
-// The method blocks until a reply or error is available.
-func (f *WriteFuture) Get() (*WriteReply, error) {
-	<-f.c
-	return f.reply, f.err
-}
-
-// Done reports if a reply or error is available for the WriteFuture.
-func (f *WriteFuture) Done() bool {
-	select {
-	case <-f.c:
-		return true
-	default:
-		return false
-	}
-}
-
-/* 'gorums' plugin for protoc-gen-go - generated from: mgr_rpc_tmpl */
+/* Unexported types and methods for quorum call method Read */
 
 type readReply struct {
 	nid   uint32
@@ -493,17 +324,37 @@ type readReply struct {
 	err   error
 }
 
-func (m *Manager) read(c *Configuration, args *Key) (*ReadReply, error) {
-	replyChan := make(chan readReply, c.n)
-	ctx, cancel := context.WithCancel(context.Background())
+func (c *Configuration) read(ctx context.Context, a *Key) (resp *Content, err error) {
+	var ti traceInfo
+	if c.mgr.opts.trace {
+		ti.tr = trace.New("gorums."+c.tstring()+".Sent", "Read")
+		defer ti.tr.Finish()
 
+		ti.firstLine.cid = c.id
+		if deadline, ok := ctx.Deadline(); ok {
+			ti.firstLine.deadline = deadline.Sub(time.Now())
+		}
+		ti.tr.LazyLog(&ti.firstLine, false)
+		ti.tr.LazyLog(&payload{sent: true, msg: a}, false)
+
+		defer func() {
+			ti.tr.LazyLog(&qcresult{
+				reply: resp,
+				err:   err,
+			}, false)
+			if err != nil {
+				ti.tr.SetError()
+			}
+		}()
+	}
+
+	replyChan := make(chan readReply, c.n)
 	for _, n := range c.nodes {
-		go callGRPCRead(n, ctx, args, replyChan)
+		go callGRPCRead(ctx, n, a, replyChan)
 	}
 
 	var (
 		replyValues = make([]*Value, 0, c.n)
-		reply       = &ReadReply{NodeIDs: make([]uint32, 0, c.n)}
 		errCount    int
 		quorum      bool
 	)
@@ -513,45 +364,58 @@ func (m *Manager) read(c *Configuration, args *Key) (*ReadReply, error) {
 		case r := <-replyChan:
 			if r.err != nil {
 				errCount++
-				goto terminationCheck
+				break
+			}
+			if c.mgr.opts.trace {
+				ti.tr.LazyLog(&payload{sent: false, id: r.nid, msg: r.reply}, false)
 			}
 			replyValues = append(replyValues, r.reply)
-			reply.NodeIDs = append(reply.NodeIDs, r.nid)
-			if reply.Reply, quorum = c.qspec.ReadQF(replyValues); quorum {
-				cancel()
-				return reply, nil
+			if resp, quorum = c.qspec.ReadQF(replyValues); quorum {
+				return resp, nil
 			}
-		case <-time.After(c.timeout):
-			cancel()
-			return reply, TimeoutRPCError{c.timeout, errCount, len(replyValues)}
+		case <-ctx.Done():
+			return resp, QuorumCallError{ctx.Err().Error(), errCount, len(replyValues)}
 		}
 
-	terminationCheck:
 		if errCount+len(replyValues) == c.n {
-			cancel()
-			return reply, IncompleteRPCError{errCount, len(replyValues)}
+			return resp, QuorumCallError{"incomplete call", errCount, len(replyValues)}
 		}
 	}
 }
 
-func callGRPCRead(node *Node, ctx context.Context, args *Key, replyChan chan<- readReply) {
+func callGRPCRead(ctx context.Context, node *Node, arg *Key, replyChan chan<- readReply) {
+	if arg == nil {
+		// send a nil reply to the for-select-loop
+		replyChan <- readReply{node.id, nil, nil}
+		return
+	}
 	reply := new(Value)
 	start := time.Now()
 	err := grpc.Invoke(
 		ctx,
-		"/byzq.Register/Read",
-		args,
+		"/byzq.Storage/Read",
+		arg,
 		reply,
 		node.conn,
 	)
-	switch grpc.Code(err) { // nil -> codes.OK
-	case codes.OK, codes.Canceled:
+	s, ok := status.FromError(err)
+	if ok && (s.Code() == codes.OK || s.Code() == codes.Canceled) {
 		node.setLatency(time.Since(start))
-	default:
+	} else {
 		node.setLastErr(err)
 	}
 	replyChan <- readReply{node.id, reply, err}
 }
+
+/* Exported types and methods for quorum call method Write */
+
+// Write is invoked as a quorum call on all nodes in configuration c,
+// using the same argument arg, and returns the result.
+func (c *Configuration) Write(ctx context.Context, arg *Value) (*WriteResponse, error) {
+	return c.write(ctx, arg)
+}
+
+/* Unexported types and methods for quorum call method Write */
 
 type writeReply struct {
 	nid   uint32
@@ -559,17 +423,37 @@ type writeReply struct {
 	err   error
 }
 
-func (m *Manager) write(c *Configuration, args *Value) (*WriteReply, error) {
-	replyChan := make(chan writeReply, c.n)
-	ctx, cancel := context.WithCancel(context.Background())
+func (c *Configuration) write(ctx context.Context, a *Value) (resp *WriteResponse, err error) {
+	var ti traceInfo
+	if c.mgr.opts.trace {
+		ti.tr = trace.New("gorums."+c.tstring()+".Sent", "Write")
+		defer ti.tr.Finish()
 
+		ti.firstLine.cid = c.id
+		if deadline, ok := ctx.Deadline(); ok {
+			ti.firstLine.deadline = deadline.Sub(time.Now())
+		}
+		ti.tr.LazyLog(&ti.firstLine, false)
+		ti.tr.LazyLog(&payload{sent: true, msg: a}, false)
+
+		defer func() {
+			ti.tr.LazyLog(&qcresult{
+				reply: resp,
+				err:   err,
+			}, false)
+			if err != nil {
+				ti.tr.SetError()
+			}
+		}()
+	}
+
+	replyChan := make(chan writeReply, c.n)
 	for _, n := range c.nodes {
-		go callGRPCWrite(n, ctx, args, replyChan)
+		go callGRPCWrite(ctx, n, a, replyChan)
 	}
 
 	var (
 		replyValues = make([]*WriteResponse, 0, c.n)
-		reply       = &WriteReply{NodeIDs: make([]uint32, 0, c.n)}
 		errCount    int
 		quorum      bool
 	)
@@ -579,41 +463,44 @@ func (m *Manager) write(c *Configuration, args *Value) (*WriteReply, error) {
 		case r := <-replyChan:
 			if r.err != nil {
 				errCount++
-				goto terminationCheck
+				break
+			}
+			if c.mgr.opts.trace {
+				ti.tr.LazyLog(&payload{sent: false, id: r.nid, msg: r.reply}, false)
 			}
 			replyValues = append(replyValues, r.reply)
-			reply.NodeIDs = append(reply.NodeIDs, r.nid)
-			if reply.Reply, quorum = c.qspec.WriteQF(replyValues); quorum {
-				cancel()
-				return reply, nil
+			if resp, quorum = c.qspec.WriteQF(a, replyValues); quorum {
+				return resp, nil
 			}
-		case <-time.After(c.timeout):
-			cancel()
-			return reply, TimeoutRPCError{c.timeout, errCount, len(replyValues)}
+		case <-ctx.Done():
+			return resp, QuorumCallError{ctx.Err().Error(), errCount, len(replyValues)}
 		}
 
-	terminationCheck:
 		if errCount+len(replyValues) == c.n {
-			cancel()
-			return reply, IncompleteRPCError{errCount, len(replyValues)}
+			return resp, QuorumCallError{"incomplete call", errCount, len(replyValues)}
 		}
 	}
 }
 
-func callGRPCWrite(node *Node, ctx context.Context, args *Value, replyChan chan<- writeReply) {
+func callGRPCWrite(ctx context.Context, node *Node, arg *Value, replyChan chan<- writeReply) {
+	if arg == nil {
+		// send a nil reply to the for-select-loop
+		replyChan <- writeReply{node.id, nil, nil}
+		return
+	}
 	reply := new(WriteResponse)
 	start := time.Now()
 	err := grpc.Invoke(
 		ctx,
-		"/byzq.Register/Write",
-		args,
+		"/byzq.Storage/Write",
+		arg,
 		reply,
 		node.conn,
 	)
-	switch grpc.Code(err) { // nil -> codes.OK
-	case codes.OK, codes.Canceled:
+	s, ok := status.FromError(err)
+	if ok && (s.Code() == codes.OK || s.Code() == codes.Canceled) {
 		node.setLatency(time.Since(start))
-	default:
+	} else {
 		node.setLastErr(err)
 	}
 	replyChan <- writeReply{node.id, reply, err}
@@ -630,7 +517,9 @@ type Node struct {
 	addr string
 	conn *grpc.ClientConn
 
-	sync.Mutex
+	StorageClient StorageClient
+
+	mu      sync.Mutex
 	lastErr error
 	latency time.Duration
 }
@@ -642,16 +531,18 @@ func (n *Node) connect(opts ...grpc.DialOption) error {
 		return fmt.Errorf("dialing node failed: %v", err)
 	}
 
+	n.StorageClient = NewStorageClient(n.conn)
+
 	return nil
 }
 
 func (n *Node) close() error {
-	var err error
-	err2 := n.conn.Close()
-	if err != nil {
-		return fmt.Errorf("stream close failed: %v", err)
-	} else if err2 != nil {
-		return fmt.Errorf("conn close failed: %v", err2)
+	// TODO: Log error, mainly care about the connection error below.
+	// We should log this error, but we currently don't have access to the
+	// logger in the manager.
+
+	if err := n.conn.Close(); err != nil {
+		return fmt.Errorf("conn close error: %v", err)
 	}
 	return nil
 }
@@ -660,10 +551,13 @@ func (n *Node) close() error {
 
 // QuorumSpec is the interface that wraps every quorum function.
 type QuorumSpec interface {
-	// ReadQF is the quorum function for the Read RPC method.
-	ReadQF(replies []*Value) (*Value, bool)
-	// WriteQF is the quorum function for the Write RPC method.
-	WriteQF(replies []*WriteResponse) (*WriteResponse, bool)
+	// ReadQF is the quorum function for the Read
+	// quorum call method.
+	ReadQF(replies []*Value) (*Content, bool)
+
+	// WriteQF is the quorum function for the Write
+	// quorum call method.
+	WriteQF(req *Value, replies []*WriteResponse) (*WriteResponse, bool)
 }
 
 /* Static resources */
@@ -673,12 +567,11 @@ type QuorumSpec interface {
 // A Configuration represents a static set of nodes on which quorum remote
 // procedure calls may be invoked.
 type Configuration struct {
-	id      uint32
-	nodes   []*Node
-	n       int
-	mgr     *Manager
-	timeout time.Duration
-	qspec   QuorumSpec
+	id    uint32
+	nodes []*Node
+	n     int
+	mgr   *Manager
+	qspec QuorumSpec
 }
 
 // ID reports the identifier for the configuration.
@@ -687,13 +580,20 @@ func (c *Configuration) ID() uint32 {
 }
 
 // NodeIDs returns a slice containing the local ids of all the nodes in the
-// configuration.
+// configuration. IDs are returned in the same order as they were provided in
+// the creation of the Configuration.
 func (c *Configuration) NodeIDs() []uint32 {
 	ids := make([]uint32, len(c.nodes))
 	for i, node := range c.nodes {
 		ids[i] = node.ID()
 	}
 	return ids
+}
+
+// Nodes returns a slice of each available node. IDs are returned in the same
+// order as they were provided in the creation of the Configuration.
+func (c *Configuration) Nodes() []*Node {
+	return c.nodes
 }
 
 // Size returns the number of nodes in the configuration.
@@ -705,18 +605,13 @@ func (c *Configuration) String() string {
 	return fmt.Sprintf("configuration %d", c.id)
 }
 
+func (c *Configuration) tstring() string {
+	return fmt.Sprintf("config-%d", c.id)
+}
+
 // Equal returns a boolean reporting whether a and b represents the same
 // configuration.
 func Equal(a, b *Configuration) bool { return a.id == b.id }
-
-// NewTestConfiguration returns a new configuration with quorum size q and
-// node size n. No other fields are set. Configurations returned from this
-// constructor should only be used when testing quorum functions.
-func NewTestConfiguration(q, n int) *Configuration {
-	return &Configuration{
-		nodes: make([]*Node, n),
-	}
-}
 
 /* errors.go */
 
@@ -735,31 +630,6 @@ func (e ConfigNotFoundError) Error() string {
 	return fmt.Sprintf("configuration not found: %d", e)
 }
 
-// An IncompleteRPCError reports that a quorum RPC call failed.
-type IncompleteRPCError struct {
-	ErrCount, ReplyCount int
-}
-
-func (e IncompleteRPCError) Error() string {
-	return fmt.Sprintf(
-		"incomplete rpc (errors: %d, replies: %d)",
-		e.ErrCount, e.ReplyCount,
-	)
-}
-
-// An TimeoutRPCError reports that a quorum RPC call timed out.
-type TimeoutRPCError struct {
-	Waited                 time.Duration
-	ErrCount, RepliesCount int
-}
-
-func (e TimeoutRPCError) Error() string {
-	return fmt.Sprintf(
-		"rpc timed out: waited %v (errors: %d, replies: %d)",
-		e.Waited, e.ErrCount, e.RepliesCount,
-	)
-}
-
 // An IllegalConfigError reports that a specified configuration could not be
 // created.
 type IllegalConfigError string
@@ -774,15 +644,35 @@ func ManagerCreationError(err error) error {
 	return fmt.Errorf("could not create manager: %s", err.Error())
 }
 
+// A QuorumCallError is used to report that a quorum call failed.
+type QuorumCallError struct {
+	Reason               string
+	ErrCount, ReplyCount int
+}
+
+func (e QuorumCallError) Error() string {
+	return fmt.Sprintf(
+		"quorum call error: %s (errors: %d, replies: %d)",
+		e.Reason, e.ErrCount, e.ReplyCount,
+	)
+}
+
+/* level.go */
+
+// LevelNotSet is the zero value level used to indicate that no level (and
+// thereby no reply) has been set for a correctable quorum call.
+const LevelNotSet = -1
+
 /* mgr.go */
 
 // Manager manages a pool of node configurations on which quorum remote
 // procedure calls can be made.
 type Manager struct {
-	sync.RWMutex
-
-	nodes   map[uint32]*Node
-	configs map[uint32]*Configuration
+	mu       sync.Mutex
+	nodes    []*Node
+	lookup   map[uint32]*Node
+	configs  map[uint32]*Configuration
+	eventLog trace.EventLog
 
 	closeOnce sync.Once
 	logger    *log.Logger
@@ -797,7 +687,7 @@ func NewManager(nodeAddrs []string, opts ...ManagerOption) (*Manager, error) {
 	}
 
 	m := &Manager{
-		nodes:   make(map[uint32]*Node),
+		lookup:  make(map[uint32]*Node),
 		configs: make(map[uint32]*Configuration),
 	}
 
@@ -805,34 +695,21 @@ func NewManager(nodeAddrs []string, opts ...ManagerOption) (*Manager, error) {
 		opt(&m.opts)
 	}
 
-	selfAddrIndex, selfID, err := m.parseSelfOptions(nodeAddrs)
-	if err != nil {
-		return nil, ManagerCreationError(err)
-	}
-
-	idSeen := false
-	for i, naddr := range nodeAddrs {
+	for _, naddr := range nodeAddrs {
 		node, err2 := m.createNode(naddr)
 		if err2 != nil {
 			return nil, ManagerCreationError(err2)
 		}
-		m.nodes[node.id] = node
-		if i == selfAddrIndex {
-			node.self = true
-			continue
-		}
-		if node.id == selfID {
-			node.self = true
-			idSeen = true
-		}
-	}
-	if selfID != 0 && !idSeen {
-		return nil, ManagerCreationError(
-			fmt.Errorf("WithSelfID provided, but no node with id %d found", selfID),
-		)
+		m.lookup[node.id] = node
+		m.nodes = append(m.nodes, node)
 	}
 
-	err = m.connectAll()
+	if m.opts.trace {
+		title := strings.Join(nodeAddrs, ",")
+		m.eventLog = trace.NewEventLog("gorums.Manager", title)
+	}
+
+	err := m.connectAll()
 	if err != nil {
 		return nil, ManagerCreationError(err)
 	}
@@ -841,33 +718,16 @@ func NewManager(nodeAddrs []string, opts ...ManagerOption) (*Manager, error) {
 		m.logger = m.opts.logger
 	}
 
+	if m.eventLog != nil {
+		m.eventLog.Printf("ready")
+	}
+
 	return m, nil
 }
 
-func (m *Manager) parseSelfOptions(addrs []string) (int, uint32, error) {
-	if m.opts.selfAddr != "" && m.opts.selfID != 0 {
-		return 0, 0, fmt.Errorf("both WithSelfAddr and WithSelfID provided")
-	}
-	if m.opts.selfID != 0 {
-		return -1, m.opts.selfID, nil
-	}
-	if m.opts.selfAddr == "" {
-		return -1, 0, nil
-	}
-
-	seen, index := contains(m.opts.selfAddr, addrs)
-	if !seen {
-		return 0, 0, fmt.Errorf(
-			"option WithSelfAddr provided, but address %q was not present in address list",
-			m.opts.selfAddr)
-	}
-
-	return index, 0, nil
-}
-
 func (m *Manager) createNode(addr string) (*Node, error) {
-	m.Lock()
-	defer m.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
@@ -878,7 +738,7 @@ func (m *Manager) createNode(addr string) (*Node, error) {
 	_, _ = h.Write([]byte(tcpAddr.String()))
 	id := h.Sum32()
 
-	if _, found := m.nodes[id]; found {
+	if _, found := m.lookup[id]; found {
 		return nil, fmt.Errorf("create node %s error: node already exists", addr)
 	}
 
@@ -895,12 +755,17 @@ func (m *Manager) connectAll() error {
 	if m.opts.noConnect {
 		return nil
 	}
+
+	if m.eventLog != nil {
+		m.eventLog.Printf("connecting")
+	}
+
 	for _, node := range m.nodes {
-		if node.self {
-			continue
-		}
 		err := node.connect(m.opts.grpcDialOpts...)
 		if err != nil {
+			if m.eventLog != nil {
+				m.eventLog.Errorf("connect failed, error connecting to node %s, error: %v", node.addr, err)
+			}
 			return fmt.Errorf("connect node %s error: %v", node.addr, err)
 		}
 	}
@@ -909,9 +774,6 @@ func (m *Manager) connectAll() error {
 
 func (m *Manager) closeNodeConns() {
 	for _, node := range m.nodes {
-		if node.self {
-			continue
-		}
 		err := node.close()
 		if err == nil {
 			continue
@@ -925,71 +787,66 @@ func (m *Manager) closeNodeConns() {
 // Close closes all node connections and any client streams.
 func (m *Manager) Close() {
 	m.closeOnce.Do(func() {
+		if m.eventLog != nil {
+			m.eventLog.Printf("closing")
+		}
 		m.closeNodeConns()
 	})
 }
 
-// NodeIDs returns the identifier of each available node.
+// NodeIDs returns the identifier of each available node. IDs are returned in
+// the same order as they were provided in the creation of the Manager.
 func (m *Manager) NodeIDs() []uint32 {
-	m.RLock()
-	defer m.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	ids := make([]uint32, 0, len(m.nodes))
-	for id := range m.nodes {
-		ids = append(ids, id)
+	for _, node := range m.nodes {
+		ids = append(ids, node.ID())
 	}
-	sort.Sort(idSlice(ids))
 	return ids
 }
 
 // Node returns the node with the given identifier if present.
 func (m *Manager) Node(id uint32) (node *Node, found bool) {
-	m.RLock()
-	defer m.RUnlock()
-	node, found = m.nodes[id]
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	node, found = m.lookup[id]
 	return node, found
 }
 
-// Nodes returns a slice of each available node.
-func (m *Manager) Nodes(excludeSelf bool) []*Node {
-	m.RLock()
-	defer m.RUnlock()
-	var nodes []*Node
-	for _, node := range m.nodes {
-		if excludeSelf && node.self {
-			continue
-		}
-		nodes = append(nodes, node)
-	}
-	OrderedBy(ID).Sort(nodes)
-	return nodes
+// Nodes returns a slice of each available node. IDs are returned in the same
+// order as they were provided in the creation of the Manager.
+func (m *Manager) Nodes() []*Node {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.nodes
 }
 
 // ConfigurationIDs returns the identifier of each available
 // configuration.
 func (m *Manager) ConfigurationIDs() []uint32 {
-	m.RLock()
-	defer m.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	ids := make([]uint32, 0, len(m.configs))
 	for id := range m.configs {
 		ids = append(ids, id)
 	}
-	sort.Sort(idSlice(ids))
 	return ids
 }
 
 // Configuration returns the configuration with the given global
 // identifier if present.
 func (m *Manager) Configuration(id uint32) (config *Configuration, found bool) {
-	m.RLock()
-	defer m.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	config, found = m.configs[id]
 	return config, found
 }
 
 // Configurations returns a slice of each available configuration.
 func (m *Manager) Configurations() []*Configuration {
-	m.RLock()
-	defer m.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	configs := make([]*Configuration, 0, len(m.configs))
 	for _, conf := range m.configs {
 		configs = append(configs, conf)
@@ -999,8 +856,8 @@ func (m *Manager) Configurations() []*Configuration {
 
 // Size returns the number of nodes and configurations in the Manager.
 func (m *Manager) Size() (nodes, configs int) {
-	m.RLock()
-	defer m.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return len(m.nodes), len(m.configs)
 }
 
@@ -1012,38 +869,38 @@ func (m *Manager) AddNode(addr string) error {
 
 // NewConfiguration returns a new configuration given quorum specification and
 // a timeout.
-func (m *Manager) NewConfiguration(ids []uint32, qspec QuorumSpec, timeout time.Duration) (*Configuration, error) {
-	m.Lock()
-	defer m.Unlock()
+func (m *Manager) NewConfiguration(ids []uint32, qspec QuorumSpec) (*Configuration, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	if len(ids) == 0 {
 		return nil, IllegalConfigError("need at least one node")
 	}
-	if timeout <= 0 {
-		return nil, IllegalConfigError("timeout must be positive")
-	}
 
 	var cnodes []*Node
+	unique := make(map[uint32]struct{})
+	var deduped []uint32
 	for _, nid := range ids {
-		node, found := m.nodes[nid]
+		// Ensure that identical ids are only counted once.
+		if _, duplicate := unique[nid]; duplicate {
+			continue
+		}
+		unique[nid] = struct{}{}
+		deduped = append(deduped, nid)
+
+		node, found := m.lookup[nid]
 		if !found {
 			return nil, NodeNotFoundError(nid)
-		}
-		if node.self && m.selfSpecified() {
-			return nil, IllegalConfigError(
-				fmt.Sprintf("self (%d) can't be part of a configuration when a self-option is provided", nid),
-			)
 		}
 		cnodes = append(cnodes, node)
 	}
 
 	// Node ids are sorted ensure a globally consistent configuration id.
-	OrderedBy(ID).Sort(cnodes)
+	sort.Sort(idSlice(deduped))
 
 	h := fnv.New32a()
-	binary.Write(h, binary.LittleEndian, timeout)
-	for _, node := range cnodes {
-		binary.Write(h, binary.LittleEndian, node.id)
+	for _, id := range deduped {
+		binary.Write(h, binary.LittleEndian, id)
 	}
 	cid := h.Sum32()
 
@@ -1053,20 +910,15 @@ func (m *Manager) NewConfiguration(ids []uint32, qspec QuorumSpec, timeout time.
 	}
 
 	c := &Configuration{
-		id:      cid,
-		nodes:   cnodes,
-		n:       len(cnodes),
-		mgr:     m,
-		qspec:   qspec,
-		timeout: timeout,
+		id:    cid,
+		nodes: cnodes,
+		n:     len(cnodes),
+		mgr:   m,
+		qspec: qspec,
 	}
 	m.configs[cid] = c
 
 	return c, nil
-}
-
-func (m *Manager) selfSpecified() bool {
-	return m.opts.selfAddr != "" || m.opts.selfID != 0
 }
 
 type idSlice []uint32
@@ -1088,8 +940,8 @@ func (n *Node) Address() string {
 }
 
 func (n *Node) String() string {
-	n.Lock()
-	defer n.Unlock()
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	return fmt.Sprintf(
 		"node %d | addr: %s | latency: %v",
 		n.id, n.addr, n.latency,
@@ -1097,30 +949,30 @@ func (n *Node) String() string {
 }
 
 func (n *Node) setLastErr(err error) {
-	n.Lock()
-	defer n.Unlock()
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	n.lastErr = err
 }
 
 // LastErr returns the last error encountered (if any) when invoking a remote
 // procedure call on this node.
 func (n *Node) LastErr() error {
-	n.Lock()
-	defer n.Unlock()
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	return n.lastErr
 }
 
 func (n *Node) setLatency(lat time.Duration) {
-	n.Lock()
-	defer n.Unlock()
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	n.latency = lat
 }
 
 // Latency returns the latency of the last successful remote procedure call
 // made to this node.
 func (n *Node) Latency() time.Duration {
-	n.Lock()
-	defer n.Unlock()
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	return n.latency
 }
 
@@ -1213,8 +1065,7 @@ type managerOptions struct {
 	grpcDialOpts []grpc.DialOption
 	logger       *log.Logger
 	noConnect    bool
-	selfAddr     string
-	selfID       uint32
+	trace        bool
 }
 
 // ManagerOption provides a way to set different options on a new Manager.
@@ -1245,33 +1096,78 @@ func WithNoConnect() ManagerOption {
 	}
 }
 
-// WithSelfAddr returns a ManagerOption which instructs the Manager not to connect
-// to the node with network address addr. The address must be present in the
-// list of node addresses provided to the Manager.
-func WithSelfAddr(addr string) ManagerOption {
+// WithTracing controls whether to trace qourum calls for this Manager instance
+// using the golang.org/x/net/trace package. Tracing is currently only supported
+// for regular quorum calls.
+func WithTracing() ManagerOption {
 	return func(o *managerOptions) {
-		o.selfAddr = addr
+		o.trace = true
 	}
 }
 
-// WithSelfID returns a ManagerOption which instructs the Manager not to
-// connect to the node with the given id. The node must be present in the list
-// of node addresses provided to the Manager.
-func WithSelfID(id uint32) ManagerOption {
-	return func(o *managerOptions) {
-		o.selfID = id
+/* trace.go */
+
+type traceInfo struct {
+	tr        trace.Trace
+	firstLine firstLine
+}
+
+type firstLine struct {
+	deadline time.Duration
+	cid      uint32
+}
+
+func (f *firstLine) String() string {
+	var line bytes.Buffer
+	io.WriteString(&line, "QC: to config")
+	fmt.Fprintf(&line, "%v deadline:", f.cid)
+	if f.deadline != 0 {
+		fmt.Fprint(&line, f.deadline)
+	} else {
+		io.WriteString(&line, "none")
 	}
+	return line.String()
+}
+
+type payload struct {
+	sent bool
+	id   uint32
+	msg  interface{}
+}
+
+func (p payload) String() string {
+	if p.sent {
+		return fmt.Sprintf("sent: %v", p.msg)
+	}
+	return fmt.Sprintf("recv from %d: %v", p.id, p.msg)
+}
+
+type qcresult struct {
+	ids   []uint32
+	reply interface{}
+	err   error
+}
+
+func (q qcresult) String() string {
+	var out bytes.Buffer
+	io.WriteString(&out, "recv QC reply: ")
+	fmt.Fprintf(&out, "ids: %v, ", q.ids)
+	fmt.Fprintf(&out, "reply: %v ", q.reply)
+	if q.err != nil {
+		fmt.Fprintf(&out, ", error: %v", q.err)
+	}
+	return out.String()
 }
 
 /* util.go */
 
-func contains(addr string, addrs []string) (found bool, index int) {
-	for i, a := range addrs {
-		if addr == a {
-			return true, i
+func appendIfNotPresent(set []uint32, x uint32) []uint32 {
+	for _, y := range set {
+		if y == x {
+			return set
 		}
 	}
-	return false, -1
+	return append(set, x)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1280,252 +1176,252 @@ var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion3
+const _ = grpc.SupportPackageIsVersion4
 
-// Client API for Register service
+// Client API for Storage service
 
-type RegisterClient interface {
+type StorageClient interface {
 	Read(ctx context.Context, in *Key, opts ...grpc.CallOption) (*Value, error)
 	Write(ctx context.Context, in *Value, opts ...grpc.CallOption) (*WriteResponse, error)
 }
 
-type registerClient struct {
+type storageClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewRegisterClient(cc *grpc.ClientConn) RegisterClient {
-	return &registerClient{cc}
+func NewStorageClient(cc *grpc.ClientConn) StorageClient {
+	return &storageClient{cc}
 }
 
-func (c *registerClient) Read(ctx context.Context, in *Key, opts ...grpc.CallOption) (*Value, error) {
+func (c *storageClient) Read(ctx context.Context, in *Key, opts ...grpc.CallOption) (*Value, error) {
 	out := new(Value)
-	err := grpc.Invoke(ctx, "/byzq.Register/Read", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/byzq.Storage/Read", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *registerClient) Write(ctx context.Context, in *Value, opts ...grpc.CallOption) (*WriteResponse, error) {
+func (c *storageClient) Write(ctx context.Context, in *Value, opts ...grpc.CallOption) (*WriteResponse, error) {
 	out := new(WriteResponse)
-	err := grpc.Invoke(ctx, "/byzq.Register/Write", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/byzq.Storage/Write", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Server API for Register service
+// Server API for Storage service
 
-type RegisterServer interface {
+type StorageServer interface {
 	Read(context.Context, *Key) (*Value, error)
 	Write(context.Context, *Value) (*WriteResponse, error)
 }
 
-func RegisterRegisterServer(s *grpc.Server, srv RegisterServer) {
-	s.RegisterService(&_Register_serviceDesc, srv)
+func RegisterStorageServer(s *grpc.Server, srv StorageServer) {
+	s.RegisterService(&_Storage_serviceDesc, srv)
 }
 
-func _Register_Read_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Storage_Read_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Key)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RegisterServer).Read(ctx, in)
+		return srv.(StorageServer).Read(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/byzq.Register/Read",
+		FullMethod: "/byzq.Storage/Read",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RegisterServer).Read(ctx, req.(*Key))
+		return srv.(StorageServer).Read(ctx, req.(*Key))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Register_Write_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Storage_Write_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Value)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RegisterServer).Write(ctx, in)
+		return srv.(StorageServer).Write(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/byzq.Register/Write",
+		FullMethod: "/byzq.Storage/Write",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RegisterServer).Write(ctx, req.(*Value))
+		return srv.(StorageServer).Write(ctx, req.(*Value))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _Register_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "byzq.Register",
-	HandlerType: (*RegisterServer)(nil),
+var _Storage_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "byzq.Storage",
+	HandlerType: (*StorageServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Read",
-			Handler:    _Register_Read_Handler,
+			Handler:    _Storage_Read_Handler,
 		},
 		{
 			MethodName: "Write",
-			Handler:    _Register_Write_Handler,
+			Handler:    _Storage_Write_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: fileDescriptorByzq,
+	Metadata: "byzq.proto",
 }
 
-func (m *Key) Marshal() (data []byte, err error) {
+func (m *Key) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Key) MarshalTo(data []byte) (int, error) {
+func (m *Key) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.Key) > 0 {
-		data[i] = 0xa
+		dAtA[i] = 0xa
 		i++
-		i = encodeVarintByzq(data, i, uint64(len(m.Key)))
-		i += copy(data[i:], m.Key)
+		i = encodeVarintByzq(dAtA, i, uint64(len(m.Key)))
+		i += copy(dAtA[i:], m.Key)
 	}
 	return i, nil
 }
 
-func (m *Content) Marshal() (data []byte, err error) {
+func (m *Content) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Content) MarshalTo(data []byte) (int, error) {
+func (m *Content) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.Key) > 0 {
-		data[i] = 0xa
+		dAtA[i] = 0xa
 		i++
-		i = encodeVarintByzq(data, i, uint64(len(m.Key)))
-		i += copy(data[i:], m.Key)
+		i = encodeVarintByzq(dAtA, i, uint64(len(m.Key)))
+		i += copy(dAtA[i:], m.Key)
 	}
 	if m.Timestamp != 0 {
-		data[i] = 0x10
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintByzq(data, i, uint64(m.Timestamp))
+		i = encodeVarintByzq(dAtA, i, uint64(m.Timestamp))
 	}
 	if len(m.Value) > 0 {
-		data[i] = 0x1a
+		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintByzq(data, i, uint64(len(m.Value)))
-		i += copy(data[i:], m.Value)
+		i = encodeVarintByzq(dAtA, i, uint64(len(m.Value)))
+		i += copy(dAtA[i:], m.Value)
 	}
 	return i, nil
 }
 
-func (m *Value) Marshal() (data []byte, err error) {
+func (m *Value) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Value) MarshalTo(data []byte) (int, error) {
+func (m *Value) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if m.C != nil {
-		data[i] = 0xa
+		dAtA[i] = 0xa
 		i++
-		i = encodeVarintByzq(data, i, uint64(m.C.Size()))
-		n1, err := m.C.MarshalTo(data[i:])
+		i = encodeVarintByzq(dAtA, i, uint64(m.C.Size()))
+		n1, err := m.C.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n1
 	}
 	if len(m.SignatureR) > 0 {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintByzq(data, i, uint64(len(m.SignatureR)))
-		i += copy(data[i:], m.SignatureR)
+		i = encodeVarintByzq(dAtA, i, uint64(len(m.SignatureR)))
+		i += copy(dAtA[i:], m.SignatureR)
 	}
 	if len(m.SignatureS) > 0 {
-		data[i] = 0x1a
+		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintByzq(data, i, uint64(len(m.SignatureS)))
-		i += copy(data[i:], m.SignatureS)
+		i = encodeVarintByzq(dAtA, i, uint64(len(m.SignatureS)))
+		i += copy(dAtA[i:], m.SignatureS)
 	}
 	return i, nil
 }
 
-func (m *WriteResponse) Marshal() (data []byte, err error) {
+func (m *WriteResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *WriteResponse) MarshalTo(data []byte) (int, error) {
+func (m *WriteResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if m.Timestamp != 0 {
-		data[i] = 0x8
+		dAtA[i] = 0x8
 		i++
-		i = encodeVarintByzq(data, i, uint64(m.Timestamp))
+		i = encodeVarintByzq(dAtA, i, uint64(m.Timestamp))
 	}
 	return i, nil
 }
 
-func encodeFixed64Byzq(data []byte, offset int, v uint64) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	data[offset+4] = uint8(v >> 32)
-	data[offset+5] = uint8(v >> 40)
-	data[offset+6] = uint8(v >> 48)
-	data[offset+7] = uint8(v >> 56)
+func encodeFixed64Byzq(dAtA []byte, offset int, v uint64) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
+	dAtA[offset+4] = uint8(v >> 32)
+	dAtA[offset+5] = uint8(v >> 40)
+	dAtA[offset+6] = uint8(v >> 48)
+	dAtA[offset+7] = uint8(v >> 56)
 	return offset + 8
 }
-func encodeFixed32Byzq(data []byte, offset int, v uint32) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
+func encodeFixed32Byzq(dAtA []byte, offset int, v uint32) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
 	return offset + 4
 }
-func encodeVarintByzq(data []byte, offset int, v uint64) int {
+func encodeVarintByzq(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
-		data[offset] = uint8(v&0x7f | 0x80)
+		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
-	data[offset] = uint8(v)
+	dAtA[offset] = uint8(v)
 	return offset + 1
 }
 func (m *Key) Size() (n int) {
@@ -1647,8 +1543,8 @@ func valueToStringByzq(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *Key) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Key) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1660,7 +1556,7 @@ func (m *Key) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1688,7 +1584,7 @@ func (m *Key) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1703,11 +1599,11 @@ func (m *Key) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Key = string(data[iNdEx:postIndex])
+			m.Key = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipByzq(data[iNdEx:])
+			skippy, err := skipByzq(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1726,8 +1622,8 @@ func (m *Key) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *Content) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Content) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1739,7 +1635,7 @@ func (m *Content) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1767,7 +1663,7 @@ func (m *Content) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1782,7 +1678,7 @@ func (m *Content) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Key = string(data[iNdEx:postIndex])
+			m.Key = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 0 {
@@ -1796,7 +1692,7 @@ func (m *Content) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Timestamp |= (int64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1815,7 +1711,7 @@ func (m *Content) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1830,11 +1726,11 @@ func (m *Content) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Value = string(data[iNdEx:postIndex])
+			m.Value = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipByzq(data[iNdEx:])
+			skippy, err := skipByzq(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1853,8 +1749,8 @@ func (m *Content) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *Value) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Value) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1866,7 +1762,7 @@ func (m *Value) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1894,7 +1790,7 @@ func (m *Value) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1911,7 +1807,7 @@ func (m *Value) Unmarshal(data []byte) error {
 			if m.C == nil {
 				m.C = &Content{}
 			}
-			if err := m.C.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.C.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1927,7 +1823,7 @@ func (m *Value) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				byteLen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1941,7 +1837,7 @@ func (m *Value) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.SignatureR = append(m.SignatureR[:0], data[iNdEx:postIndex]...)
+			m.SignatureR = append(m.SignatureR[:0], dAtA[iNdEx:postIndex]...)
 			if m.SignatureR == nil {
 				m.SignatureR = []byte{}
 			}
@@ -1958,7 +1854,7 @@ func (m *Value) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				byteLen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1972,14 +1868,14 @@ func (m *Value) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.SignatureS = append(m.SignatureS[:0], data[iNdEx:postIndex]...)
+			m.SignatureS = append(m.SignatureS[:0], dAtA[iNdEx:postIndex]...)
 			if m.SignatureS == nil {
 				m.SignatureS = []byte{}
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipByzq(data[iNdEx:])
+			skippy, err := skipByzq(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1998,8 +1894,8 @@ func (m *Value) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *WriteResponse) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *WriteResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2011,7 +1907,7 @@ func (m *WriteResponse) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2039,7 +1935,7 @@ func (m *WriteResponse) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Timestamp |= (int64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2048,7 +1944,7 @@ func (m *WriteResponse) Unmarshal(data []byte) error {
 			}
 		default:
 			iNdEx = preIndex
-			skippy, err := skipByzq(data[iNdEx:])
+			skippy, err := skipByzq(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2067,8 +1963,8 @@ func (m *WriteResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func skipByzq(data []byte) (n int, err error) {
-	l := len(data)
+func skipByzq(dAtA []byte) (n int, err error) {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		var wire uint64
@@ -2079,7 +1975,7 @@ func skipByzq(data []byte) (n int, err error) {
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2097,7 +1993,7 @@ func skipByzq(data []byte) (n int, err error) {
 					return 0, io.ErrUnexpectedEOF
 				}
 				iNdEx++
-				if data[iNdEx-1] < 0x80 {
+				if dAtA[iNdEx-1] < 0x80 {
 					break
 				}
 			}
@@ -2114,7 +2010,7 @@ func skipByzq(data []byte) (n int, err error) {
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				length |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2137,7 +2033,7 @@ func skipByzq(data []byte) (n int, err error) {
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
-					b := data[iNdEx]
+					b := dAtA[iNdEx]
 					iNdEx++
 					innerWire |= (uint64(b) & 0x7F) << shift
 					if b < 0x80 {
@@ -2148,7 +2044,7 @@ func skipByzq(data []byte) (n int, err error) {
 				if innerWireType == 4 {
 					break
 				}
-				next, err := skipByzq(data[start:])
+				next, err := skipByzq(dAtA[start:])
 				if err != nil {
 					return 0, err
 				}
@@ -2175,24 +2071,27 @@ var (
 func init() { proto.RegisterFile("byzq.proto", fileDescriptorByzq) }
 
 var fileDescriptorByzq = []byte{
-	// 292 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x64, 0x91, 0xc1, 0x4a, 0xf3, 0x40,
-	0x14, 0x85, 0xe7, 0xfe, 0x69, 0x7f, 0xed, 0xad, 0x05, 0x19, 0x05, 0x4b, 0x95, 0x4b, 0x99, 0x55,
-	0x41, 0xed, 0xa2, 0xbe, 0x81, 0x2e, 0xbb, 0x10, 0xa6, 0xa0, 0xb8, 0x4c, 0xdb, 0x4b, 0x09, 0xda,
-	0x24, 0x26, 0x53, 0x21, 0xae, 0x7c, 0x04, 0x1f, 0xc3, 0x47, 0x71, 0xd9, 0xa5, 0xcb, 0x66, 0xdc,
-	0xb8, 0xf4, 0x11, 0x24, 0x13, 0xc1, 0x44, 0x77, 0xe7, 0x9e, 0xc3, 0x9c, 0xf3, 0xc1, 0x20, 0x4e,
-	0xb3, 0xc7, 0xfb, 0x61, 0x9c, 0x44, 0x26, 0x92, 0x8d, 0x42, 0xab, 0x03, 0xf4, 0xc6, 0x9c, 0xc9,
-	0x5d, 0xf4, 0x6e, 0x39, 0xeb, 0x42, 0x1f, 0x06, 0x2d, 0x5d, 0x48, 0x75, 0x89, 0x5b, 0x17, 0x51,
-	0x68, 0x38, 0x34, 0x7f, 0x43, 0x79, 0x84, 0x2d, 0x13, 0x2c, 0x39, 0x35, 0xfe, 0x32, 0xee, 0xfe,
-	0xeb, 0xc3, 0xc0, 0xd3, 0x3f, 0x86, 0xdc, 0xc7, 0xe6, 0x83, 0x7f, 0xb7, 0xe2, 0xae, 0xe7, 0x5e,
-	0x94, 0x87, 0x9a, 0x63, 0xf3, 0xaa, 0x10, 0xf2, 0x10, 0x61, 0xe6, 0xca, 0xda, 0xa3, 0xce, 0xd0,
-	0x01, 0x7d, 0x0f, 0x69, 0x98, 0x49, 0x42, 0x4c, 0x83, 0x45, 0xe8, 0x9b, 0x55, 0xc2, 0xda, 0x55,
-	0xef, 0xe8, 0x8a, 0x53, 0xcb, 0x27, 0x6e, 0xa0, 0x9a, 0x4f, 0xd4, 0x29, 0x76, 0xae, 0x93, 0xc0,
-	0xb0, 0xe6, 0x34, 0x8e, 0xc2, 0x94, 0xeb, 0xa8, 0xf0, 0x0b, 0x75, 0x74, 0x83, 0xdb, 0x9a, 0x17,
-	0x41, 0x6a, 0x38, 0x91, 0x7d, 0x6c, 0x68, 0xf6, 0xe7, 0xb2, 0x55, 0x42, 0x8d, 0x39, 0xeb, 0xb5,
-	0x4b, 0xe9, 0xb8, 0x95, 0x90, 0xc7, 0xd8, 0x74, 0xe5, 0xb2, 0xea, 0xf7, 0xf6, 0xca, 0xa3, 0x36,
-	0xab, 0xc4, 0xf9, 0xc9, 0x3a, 0x27, 0xf1, 0x96, 0x93, 0xd8, 0xe4, 0x04, 0x4f, 0x96, 0xe0, 0xc5,
-	0x12, 0xbc, 0x5a, 0x82, 0xb5, 0x25, 0xd8, 0x58, 0x82, 0x0f, 0x4b, 0xe2, 0xd3, 0x12, 0x3c, 0xbf,
-	0x93, 0x98, 0xfe, 0x77, 0x9f, 0x72, 0xf6, 0x15, 0x00, 0x00, 0xff, 0xff, 0x0b, 0x56, 0x7a, 0xd3,
-	0xa2, 0x01, 0x00, 0x00,
+	// 350 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x64, 0x51, 0xc1, 0x4e, 0xea, 0x40,
+	0x14, 0xed, 0x7d, 0x85, 0xc7, 0xe3, 0xf2, 0xc8, 0x7b, 0x19, 0x4d, 0x6c, 0xaa, 0x99, 0x90, 0xc6,
+	0x05, 0x1b, 0x68, 0x02, 0x7f, 0xa0, 0x4b, 0x16, 0x26, 0x43, 0xa2, 0xeb, 0x16, 0xc6, 0xda, 0x48,
+	0x3b, 0xd8, 0x4e, 0x4d, 0xea, 0x8a, 0x4f, 0xf0, 0x33, 0xf8, 0x01, 0x7e, 0xc0, 0x95, 0x4b, 0x96,
+	0x2e, 0x65, 0xdc, 0xb8, 0x34, 0xf1, 0x07, 0x4c, 0xa7, 0x44, 0x8b, 0xae, 0xe6, 0x9c, 0x7b, 0xcf,
+	0xbd, 0xe7, 0xcc, 0x0c, 0xa2, 0x9f, 0xdf, 0xdd, 0xf4, 0xe7, 0x89, 0x90, 0x82, 0xd4, 0x0a, 0x6c,
+	0x1f, 0x07, 0xa1, 0xbc, 0xca, 0xfc, 0xfe, 0x44, 0x44, 0x6e, 0xc2, 0x67, 0x9e, 0xef, 0x06, 0x22,
+	0xc9, 0xa2, 0x74, 0x7b, 0x94, 0x5a, 0xbb, 0x57, 0x51, 0x05, 0x22, 0x10, 0xae, 0x2e, 0xfb, 0xd9,
+	0xa5, 0x66, 0x9a, 0x68, 0x54, 0xca, 0x9d, 0x03, 0x34, 0x47, 0x3c, 0x27, 0xff, 0xd1, 0xbc, 0xe6,
+	0xb9, 0x05, 0x1d, 0xe8, 0x36, 0x59, 0x01, 0x9d, 0x33, 0x6c, 0x9c, 0x8a, 0x58, 0xf2, 0x58, 0xfe,
+	0x6c, 0x92, 0x23, 0x6c, 0xca, 0x30, 0xe2, 0xa9, 0xf4, 0xa2, 0xb9, 0xf5, 0xab, 0x03, 0x5d, 0x93,
+	0x7d, 0x15, 0xc8, 0x3e, 0xd6, 0x6f, 0xbd, 0x59, 0xc6, 0x2d, 0x53, 0x4f, 0x94, 0xc4, 0x99, 0x62,
+	0xfd, 0xbc, 0x00, 0xe4, 0x10, 0x61, 0xa2, 0x97, 0xb5, 0x06, 0xed, 0xbe, 0xbe, 0xe5, 0xd6, 0x88,
+	0xc1, 0x84, 0x50, 0xc4, 0x34, 0x0c, 0x62, 0x4f, 0x66, 0x09, 0x67, 0x7a, 0xf5, 0x5f, 0x56, 0xa9,
+	0xec, 0xf4, 0xc7, 0xda, 0xa0, 0xda, 0x1f, 0x3b, 0x3d, 0x6c, 0x5f, 0x24, 0xa1, 0xe4, 0x8c, 0xa7,
+	0x73, 0x11, 0xa7, 0x7c, 0x37, 0x2a, 0x7c, 0x8b, 0x3a, 0x10, 0xd8, 0x18, 0x4b, 0x91, 0x78, 0x01,
+	0x27, 0x2e, 0xd6, 0x18, 0xf7, 0xa6, 0xa4, 0x59, 0x66, 0x1a, 0xf1, 0xdc, 0x6e, 0x95, 0x50, 0xc7,
+	0x76, 0xfe, 0x2d, 0x56, 0x16, 0x3c, 0xbc, 0x5b, 0x9f, 0xcf, 0x32, 0xc4, 0xba, 0xb6, 0x22, 0x55,
+	0x99, 0xbd, 0x57, 0x92, 0x9d, 0x10, 0xce, 0x9f, 0x62, 0x76, 0xb9, 0xb2, 0xe0, 0xa4, 0xbb, 0xde,
+	0x50, 0xe3, 0x69, 0x43, 0x8d, 0x85, 0xa2, 0xb0, 0x54, 0x14, 0x1e, 0x15, 0x85, 0xb5, 0xa2, 0xf0,
+	0xac, 0x28, 0xbc, 0x2a, 0x6a, 0xbc, 0x29, 0x0a, 0xf7, 0x2f, 0xd4, 0xf0, 0x7f, 0xeb, 0x0f, 0x1a,
+	0x7e, 0x04, 0x00, 0x00, 0xff, 0xff, 0xc5, 0x5e, 0x90, 0x01, 0x09, 0x02, 0x00, 0x00,
 }

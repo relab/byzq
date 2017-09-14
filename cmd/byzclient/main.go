@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -18,12 +19,15 @@ import (
 )
 
 func main() {
-	port := flag.Int("port", 8080, "port where local server is listening")
-	saddrs := flag.String("addrs", "", "server addresses separated by ','")
-	f := flag.Int("f", 1, "fault tolerance, supported values f=1,2,3 (this is ignored if addrs is provided)")
-	generate := flag.Bool("generate", false, "generate public/private key-pair and save to file provided by -key")
-	writer := flag.Bool("writer", false, "set this client to be writer only (default is reader only)")
-	keyFile := flag.String("key", "priv-key.pem", "private key file to be used for signatures")
+	var (
+		port     = flag.Int("port", 8080, "port where local server is listening")
+		saddrs   = flag.String("addrs", "", "server addresses separated by ','")
+		f        = flag.Int("f", 1, "fault tolerance, supported values f=1,2,3 (this is ignored if addrs is provided)")
+		noauth   = flag.Bool("noauth", false, "don't use authenticated channels")
+		generate = flag.Bool("generate", false, "generate public/private key-pair and save to file provided by -key")
+		writer   = flag.Bool("writer", false, "set this client to be writer only (default is reader only)")
+		keyFile  = flag.String("key", "priv-key.pem", "private key file to be used for signatures")
+	)
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n", os.Args[0])
@@ -33,7 +37,7 @@ func main() {
 	flag.Parse()
 
 	if *generate {
-		// generate key file and exit
+		// Generate key file and exit.
 		err := byzq.GenerateKeyfile(*keyFile)
 		if err != nil {
 			dief("error generating public/private key-pair: %v", err)
@@ -42,7 +46,7 @@ func main() {
 	}
 
 	if *saddrs == "" {
-		// use local addresses only
+		// Use local addresses only.
 		if *f > 3 || *f < 1 {
 			dief("only f=1,2,3 is allowed")
 		}
@@ -63,10 +67,15 @@ func main() {
 	}
 	log.Printf("#addrs: %d (%v)", len(addrs), *saddrs)
 
-	//TODO fix hardcoded youtube server name (can we get certificate for localhost servername?)
-	clientCreds, err := credentials.NewClientTLSFromFile("cert/ca.pem", "x.test.youtube.com")
-	if err != nil {
-		dief("error creating credentials: %v", err)
+	var secDialOption grpc.DialOption
+	if *noauth {
+		secDialOption = grpc.WithInsecure()
+	} else {
+		clientCreds, err := credentials.NewClientTLSFromFile("cert/server.crt", "127.0.0.1")
+		if err != nil {
+			dief("error creating credentials: %v", err)
+		}
+		secDialOption = grpc.WithTransportCredentials(clientCreds)
 	}
 
 	key, err := byzq.ReadKeyfile(*keyFile)
@@ -79,7 +88,7 @@ func main() {
 		byzq.WithGrpcDialOptions(
 			grpc.WithBlock(),
 			grpc.WithTimeout(0*time.Millisecond),
-			grpc.WithTransportCredentials(clientCreds),
+			secDialOption,
 		),
 	)
 	if err != nil {
@@ -92,12 +101,12 @@ func main() {
 	if err != nil {
 		dief("error creating quorum specification: %v", err)
 	}
-	conf, err := mgr.NewConfiguration(ids, qspec, time.Second)
+	conf, err := mgr.NewConfiguration(ids, qspec)
 	if err != nil {
 		dief("error creating config: %v", err)
 	}
 
-	registerState := &byzq.Content{
+	storageState := &byzq.Content{
 		Key:       "Hein",
 		Value:     "Meling",
 		Timestamp: -1,
@@ -105,27 +114,27 @@ func main() {
 
 	for {
 		if *writer {
-			// Writer client
-			registerState.Value = strconv.Itoa(rand.Intn(1 << 8))
-			registerState.Timestamp = qspec.IncWTS()
-			signedState, err := qspec.Sign(registerState)
+			// Writer client.
+			storageState.Value = strconv.Itoa(rand.Intn(1 << 8))
+			storageState.Timestamp++
+			signedState, err := qspec.Sign(storageState)
 			if err != nil {
 				dief("failed to sign message: %v", err)
 			}
-			ack, err := conf.Write(signedState)
+			ack, err := conf.Write(context.Background(), signedState)
 			if err != nil {
 				dief("error writing: %v", err)
 			}
-			fmt.Println("WriteReturn " + ack.Reply.String())
-			time.Sleep(100 * time.Second)
+			fmt.Println("WriteReturn " + ack.String())
+			time.Sleep(15 * time.Second)
 		} else {
-			// Reader client
-			val, err := conf.Read(&byzq.Key{Key: registerState.Key})
+			// Reader client.
+			val, err := conf.Read(context.Background(), &byzq.Key{Key: storageState.Key})
 			if err != nil {
 				dief("error reading: %v", err)
 			}
-			registerState = val.Reply.C
-			fmt.Println("ReadReturn: " + registerState.String())
+			storageState = val
+			fmt.Println("ReadReturn: " + storageState.String())
 			time.Sleep(10000 * time.Millisecond)
 		}
 	}

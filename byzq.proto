@@ -1,10 +1,21 @@
 syntax = "proto3";
 
+import "github.com/relab/gorums/gorums.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
 package byzq;
 
-service Register {
-	rpc Read(Key) returns (Value) {}
-	rpc Write(Value) returns (WriteResponse) {}
+service Storage {
+	rpc Read(Key) returns (Value) {
+		option (gorums.qc) = true;
+		option (gorums.custom_return_type) = "Content";
+	}
+	rpc Write(Value) returns (WriteResponse) {
+		option (gorums.qc) = true;
+		option (gorums.qf_with_req) = true;
+	}
 }
 
 // [Read, requestID]

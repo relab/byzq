@@ -13,11 +13,7 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-// run tests with: go test -v
-
-// run benchmarks: go test -run=$$ -benchmem -benchtime=5s -bench=.
-
-// TODO Make tests for f=2 and f=3
+// TODO(meling): Make tests for f=2 and f=3.
 
 var priv *ecdsa.PrivateKey
 
@@ -46,6 +42,10 @@ var authQTests = []struct {
 	q   int // expected value
 	err string
 }{
+	{-1, 0, 1, "Byzantine quorum require n>3f replicas; only got n=-1, yielding f=0"},
+	{0, 0, 1, "Byzantine quorum require n>3f replicas; only got n=0, yielding f=0"},
+	{1, 0, 1, "Byzantine quorum require n>3f replicas; only got n=1, yielding f=0"},
+	{2, 0, 2, "Byzantine quorum require n>3f replicas; only got n=2, yielding f=0"},
 	{3, 0, 2, "Byzantine quorum require n>3f replicas; only got n=3, yielding f=0"},
 	{4, 1, 2, ""},
 	{5, 1, 3, ""},
@@ -104,7 +104,7 @@ var authReadQFTests = []struct {
 	{
 		"no quorum (I)",
 		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
 		},
 		nil,
 		false,
@@ -112,8 +112,8 @@ var authReadQFTests = []struct {
 	{
 		"no quorum (II)",
 		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
 		},
 		nil,
 		false,
@@ -121,9 +121,9 @@ var authReadQFTests = []struct {
 	{
 		"quorum (I)",
 		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
 		},
 		&Content{Key: "Winnie", Value: "Poop", Timestamp: 1},
 		true,
@@ -131,9 +131,9 @@ var authReadQFTests = []struct {
 	{
 		"quorum (II)",
 		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
+			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
 		},
 		&Content{Key: "Winnie", Value: "Poo", Timestamp: 2},
 		true,
@@ -141,9 +141,9 @@ var authReadQFTests = []struct {
 	{
 		"quorum (III)",
 		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Pooop", Timestamp: 3}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
+			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Pooop", Timestamp: 3}},
 		},
 		&Content{Key: "Winnie", Value: "Pooop", Timestamp: 3},
 		true,
@@ -151,10 +151,10 @@ var authReadQFTests = []struct {
 	{
 		"quorum (IV)",
 		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Pooop", Timestamp: 3}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poooop", Timestamp: 4}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
+			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Pooop", Timestamp: 3}},
+			{C: &Content{Key: "Winnie", Value: "Poooop", Timestamp: 4}},
 		},
 		&Content{Key: "Winnie", Value: "Poooop", Timestamp: 4},
 		true,
@@ -173,7 +173,7 @@ var authReadQFTests = []struct {
 	{
 		"quorum (VI)",
 		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
 			myVal,
 			myVal,
 			myVal,
@@ -184,8 +184,8 @@ var authReadQFTests = []struct {
 	{
 		"quorum (VII)",
 		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
 			myVal,
 			myVal,
 		},
@@ -195,9 +195,9 @@ var authReadQFTests = []struct {
 	{
 		"quorum (VIII)",
 		[]*Value{
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			&Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
 			myVal,
 		},
 		myContent,
@@ -239,14 +239,14 @@ func TestAuthDataQ(t *testing.T) {
 			}
 		}
 
-		t.Run(fmt.Sprintf("ReadQF(4,1) %s", test.name), func(t *testing.T) {
+		t.Run(fmt.Sprintf("(NoSignVerification)ReadQF(4,1) %s", test.name), func(t *testing.T) {
 			reply, byzquorum := qspec.ReadQF(test.replies)
 			if byzquorum != test.rq {
 				t.Errorf("got %t, want %t", byzquorum, test.rq)
 			}
 			if reply != nil {
-				if !reply.C.Equal(test.expected) {
-					t.Errorf("got %v, want %v as quorum reply", reply.C, test.expected)
+				if !reply.Equal(test.expected) {
+					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
 				}
 			} else {
 				if test.expected != nil {
@@ -255,14 +255,14 @@ func TestAuthDataQ(t *testing.T) {
 			}
 		})
 
-		t.Run(fmt.Sprintf("LReadQF(4,1) %s", test.name), func(t *testing.T) {
-			reply, byzquorum := qspec.LReadQF(test.replies)
+		t.Run(fmt.Sprintf("SequentialVerifyReadQFReadQF(4,1) %s", test.name), func(t *testing.T) {
+			reply, byzquorum := qspec.SequentialVerifyReadQF(test.replies)
 			if byzquorum != test.rq {
 				t.Errorf("got %t, want %t", byzquorum, test.rq)
 			}
 			if reply != nil {
-				if !reply.C.Equal(test.expected) {
-					t.Errorf("got %v, want %v as quorum reply", reply.C, test.expected)
+				if !reply.Equal(test.expected) {
+					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
 				}
 			} else {
 				if test.expected != nil {
@@ -271,14 +271,29 @@ func TestAuthDataQ(t *testing.T) {
 			}
 		})
 
-		t.Run(fmt.Sprintf("L2ReadQF(4,1) %s", test.name), func(t *testing.T) {
-			reply, byzquorum := qspec.L2ReadQF(test.replies)
+		t.Run(fmt.Sprintf("ConcurrentVerifyIndexChanReadQF(4,1) %s", test.name), func(t *testing.T) {
+			reply, byzquorum := qspec.ConcurrentVerifyIndexChanReadQF(test.replies)
 			if byzquorum != test.rq {
 				t.Errorf("got %t, want %t", byzquorum, test.rq)
 			}
 			if reply != nil {
-				if !reply.C.Equal(test.expected) {
-					t.Errorf("got %v, want %v as quorum reply", reply.C, test.expected)
+				if !reply.Equal(test.expected) {
+					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+				}
+			} else {
+				if test.expected != nil {
+					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+				}
+			}
+		})
+		t.Run(fmt.Sprintf("VerfiyLastReplyFirstReadQF(4,1) %s", test.name), func(t *testing.T) {
+			reply, byzquorum := qspec.VerfiyLastReplyFirstReadQF(test.replies)
+			if byzquorum != test.rq {
+				t.Errorf("got %t, want %t", byzquorum, test.rq)
+			}
+			if reply != nil {
+				if !reply.Equal(test.expected) {
+					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
 				}
 			} else {
 				if test.expected != nil {
@@ -287,14 +302,14 @@ func TestAuthDataQ(t *testing.T) {
 			}
 		})
 
-		t.Run(fmt.Sprintf("HReadQF(4,1) %s", test.name), func(t *testing.T) {
-			reply, byzquorum := qspec.HReadQF(test.replies)
+		t.Run(fmt.Sprintf("ConcurrentVerifyWGReadQF(4,1) %s", test.name), func(t *testing.T) {
+			reply, byzquorum := qspec.ConcurrentVerifyWGReadQF(test.replies)
 			if byzquorum != test.rq {
 				t.Errorf("got %t, want %t", byzquorum, test.rq)
 			}
 			if reply != nil {
-				if !reply.C.Equal(test.expected) {
-					t.Errorf("got %v, want %v as quorum reply", reply.C, test.expected)
+				if !reply.Equal(test.expected) {
+					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
 				}
 			} else {
 				if test.expected != nil {
@@ -321,43 +336,42 @@ func BenchmarkAuthDataQ(b *testing.B) {
 			}
 		}
 
-		b.Run(fmt.Sprintf("ReadQF(4,1) %s", test.name), func(b *testing.B) {
+		b.Run(fmt.Sprintf("(NoSignVerification)ReadQF(4,1) %s", test.name), func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				for j := 1 ; j <= len(test.replies); j++ {
-					qspec.ReadQF(test.replies[:j])
-				}
+				qspec.ReadQF(test.replies)
 			}
 		})
 
-		b.Run(fmt.Sprintf("LReadQF(4,1) %s", test.name), func(b *testing.B) {
+		b.Run(fmt.Sprintf("SequentialVerifyReadQF(4,1) %s", test.name), func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				for j := 1 ; j <= len(test.replies); j++ {
-					qspec.LReadQF(test.replies[:j])
-				}
+				qspec.SequentialVerifyReadQF(test.replies)
 			}
 		})
 
-		b.Run(fmt.Sprintf("L2ReadQF(4,1) %s", test.name), func(b *testing.B) {
+		b.Run(fmt.Sprintf("ConcurrentVerifyIndexChanReadQF(4,1) %s", test.name), func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				for j := 1 ; j <= len(test.replies); j++ {
-					qspec.L2ReadQF(test.replies[:j])
-				}
+				qspec.ConcurrentVerifyIndexChanReadQF(test.replies)
+			}
+		})
+		b.Run(fmt.Sprintf("VerfiyLastReplyFirstReadQF(4,1) %s", test.name), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				qspec.VerfiyLastReplyFirstReadQF(test.replies)
 			}
 		})
 
-		b.Run(fmt.Sprintf("HReadQF(4,1) %s", test.name), func(b *testing.B) {
+		b.Run(fmt.Sprintf("ConcurrentVerifyWGReadQF(4,1) %s", test.name), func(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				for j := 1 ; j <= len(test.replies); j++ {
-					qspec.HReadQF(test.replies[:j])
-				}
+				qspec.ConcurrentVerifyWGReadQF(test.replies)
 			}
 		})
 	}
@@ -384,7 +398,7 @@ var authWriteQFTests = []struct {
 	{
 		"no quorum (I)",
 		[]*WriteResponse{
-			&WriteResponse{Timestamp: 1},
+			{Timestamp: 1},
 		},
 		nil,
 		false,
@@ -392,8 +406,8 @@ var authWriteQFTests = []struct {
 	{
 		"no quorum (II)",
 		[]*WriteResponse{
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
 		},
 		nil,
 		false,
@@ -401,10 +415,10 @@ var authWriteQFTests = []struct {
 	{
 		"no quorum (III)",
 		[]*WriteResponse{
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 2},
-			&WriteResponse{Timestamp: 3},
-			&WriteResponse{Timestamp: 4},
+			{Timestamp: 1},
+			{Timestamp: 2},
+			{Timestamp: 3},
+			{Timestamp: 4},
 		},
 		nil,
 		false,
@@ -412,10 +426,10 @@ var authWriteQFTests = []struct {
 	{
 		"no quorum (IV)",
 		[]*WriteResponse{
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 2},
-			&WriteResponse{Timestamp: 2},
+			{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 2},
+			{Timestamp: 2},
 		},
 		nil,
 		false,
@@ -423,9 +437,9 @@ var authWriteQFTests = []struct {
 	{
 		"quorum (I)",
 		[]*WriteResponse{
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
 		},
 		&WriteResponse{Timestamp: 1},
 		true,
@@ -433,10 +447,10 @@ var authWriteQFTests = []struct {
 	{
 		"quorum (II)",
 		[]*WriteResponse{
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
 		},
 		&WriteResponse{Timestamp: 1},
 		true,
@@ -444,10 +458,10 @@ var authWriteQFTests = []struct {
 	{
 		"quorum (III)",
 		[]*WriteResponse{
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 2},
+			{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 2},
 		},
 		&WriteResponse{Timestamp: 1},
 		true,
@@ -455,10 +469,10 @@ var authWriteQFTests = []struct {
 	{
 		"quorum (IV)",
 		[]*WriteResponse{
-			&WriteResponse{Timestamp: 2},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
+			{Timestamp: 2},
+			{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
 		},
 		&WriteResponse{Timestamp: 1},
 		true,
@@ -466,9 +480,9 @@ var authWriteQFTests = []struct {
 	{
 		"best-case quorum",
 		[]*WriteResponse{
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
 		},
 		&WriteResponse{Timestamp: 1},
 		true,
@@ -476,10 +490,10 @@ var authWriteQFTests = []struct {
 	{
 		"worst-case quorum",
 		[]*WriteResponse{
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
-			&WriteResponse{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
+			{Timestamp: 1},
 		},
 		&WriteResponse{Timestamp: 1},
 		true,
@@ -493,11 +507,11 @@ func TestAuthDataQW(t *testing.T) {
 	}
 	for _, test := range authWriteQFTests {
 		t.Run(fmt.Sprintf("WriteQF(4,1) %s", test.name), func(t *testing.T) {
+			req := &Value{C: &Content{Timestamp: 0}}
 			if test.expected != nil {
-				// initialize write timestamp to expected value
-				qspec.wts = test.expected.Timestamp
+				req = &Value{C: &Content{Timestamp: test.expected.Timestamp}}
 			}
-			reply, byzquorum := qspec.WriteQF(test.replies)
+			reply, byzquorum := qspec.WriteQF(req, test.replies)
 			if byzquorum != test.rq {
 				t.Errorf("got %t, want %t", byzquorum, test.rq)
 			}
@@ -514,6 +528,10 @@ func BenchmarkAuthDataQW(b *testing.B) {
 		b.Error(err)
 	}
 	for _, test := range authWriteQFTests {
+		req := &Value{C: &Content{Timestamp: 0}}
+		if test.expected != nil {
+			req = &Value{C: &Content{Timestamp: test.expected.Timestamp}}
+		}
 		if !strings.Contains(test.name, "case") {
 			continue
 		}
@@ -521,7 +539,7 @@ func BenchmarkAuthDataQW(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				qspec.WriteQF(test.replies)
+				qspec.WriteQF(req, test.replies)
 			}
 		})
 	}
