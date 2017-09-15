@@ -93,7 +93,7 @@ func (gr *byzqRequester) Setup() error {
 		if !cp.AppendCertsFromPEM([]byte(serverCRT)) {
 			return fmt.Errorf("credentials: failed to append certificates")
 		}
-		clientCreds := credentials.NewTLS(&tls.Config{ServerName: "", RootCAs: cp})
+		clientCreds := credentials.NewTLS(&tls.Config{ServerName: "127.0.0.1", RootCAs: cp})
 		secDialOption = grpc.WithTransportCredentials(clientCreds)
 	}
 	var err error
