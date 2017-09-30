@@ -133,8 +133,7 @@ func main() {
 			if err != nil {
 				dief("error reading: %v", err)
 			}
-			storageState = val
-			fmt.Println("ReadReturn: " + storageState.String())
+			fmt.Println("ReadReturn: " + val.String())
 			time.Sleep(10000 * time.Millisecond)
 		}
 	}

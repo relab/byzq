@@ -73,13 +73,13 @@ func (aq *AuthDataQ) ReadQF(replies []*Value) (*Content, bool) {
 	}
 	var highest *Value
 	for _, reply := range replies {
-		if highest != nil && reply.C.Timestamp <= highest.C.Timestamp {
+		if highest != nil && reply.GetC().GetTimestamp() <= highest.GetC().GetTimestamp() {
 			continue
 		}
 		highest = reply
 	}
 	// returns reply with the highest timestamp, or nil if no replies were verified
-	return highest.C, true
+	return highest.GetC(), true
 }
 
 // SequentialVerifyReadQF returns nil and false until the supplied replies
