@@ -1,11 +1,5 @@
 # byzq - Byzantine Quorum Protocol
 
-#### Byzantine Safe Register/Storage
-* Ref. Algo. 4.14 in RSDP.
-* Requires authenticated channels.
-* RequestID field of messages not needed since gRPC handles request matching.
-
-
 #### Authenticated-Data Byzantine Quorum.
 * Ref. Algo. 4.15 in RSDP.
 * Requires authenticated channels
@@ -13,19 +7,27 @@
 
 ## Running localhost example 
 
-#### Start servers
+#### Start four servers
 
 ```shell
 cd cmd/byzserver
-./startbyzq5.sh
+./startbyzq4.sh
 ```
 
-#### Start a client
+#### Start a writer client (should be started first so that server has data for the reader client)
 
 ```shell
 cd cmd/byzclient
 go build
-./byzclient
+./byzclient -writer
+```
+
+#### Start a reader client
+
+```shell
+cd cmd/byzclient
+go build
+./byzclient 
 ```
 
 ## Quorum function benchmarks
