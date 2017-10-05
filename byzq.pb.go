@@ -23,30 +23,23 @@ import _ "github.com/gogo/protobuf/gogoproto"
 
 import bytes "bytes"
 
-import (
-	"encoding/binary"
-	"hash/fnv"
-	"log"
-	"net"
-	"sort"
-	"sync"
-	"time"
-
-	"golang.org/x/net/trace"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-)
-
-import (
-	context "golang.org/x/net/context"
-	grpc "google.golang.org/grpc"
-)
-
-import strings "strings"
-import reflect "reflect"
-
+import binary "encoding/binary"
+import trace "golang.org/x/net/trace"
+import grpc "google.golang.org/grpc"
+import codes "google.golang.org/grpc/codes"
+import status "google.golang.org/grpc/status"
+import fnv "hash/fnv"
 import io "io"
+import log "log"
+import net "net"
+import sort "sort"
+import strings "strings"
+import sync "sync"
+import time "time"
+
+import context "golang.org/x/net/context"
+
+import reflect "reflect"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
