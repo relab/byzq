@@ -9,7 +9,7 @@ import (
 	"github.com/leanovate/gopter/prop"
 )
 
-func TestAuthSpecProperties(t *testing.T) {
+func TestAuthDataQSpecProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	properties.Property("Undefined for all <= 0", prop.ForAll(

@@ -79,8 +79,10 @@ func TestNewAuthDataQ(t *testing.T) {
 }
 
 var (
-	myContent = &Content{Key: "Winnie", Value: "Poo", Timestamp: 3}
-	myVal     = &Value{C: myContent}
+	myVal  = &Value{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}}
+	myVal2 = &Value{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 2}}
+	myVal3 = &Value{C: &Content{Key: "Winnie", Value: "Pooop", Timestamp: 3}}
+	myVal4 = &Value{C: &Content{Key: "Winnie", Value: "Poooop", Timestamp: 4}}
 )
 
 var authReadQFTests = []struct {
@@ -104,7 +106,7 @@ var authReadQFTests = []struct {
 	{
 		"no quorum (I)",
 		[]*Value{
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
+			myVal,
 		},
 		nil,
 		false,
@@ -112,8 +114,8 @@ var authReadQFTests = []struct {
 	{
 		"no quorum (II)",
 		[]*Value{
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			myVal,
+			myVal,
 		},
 		nil,
 		false,
@@ -121,42 +123,42 @@ var authReadQFTests = []struct {
 	{
 		"quorum (I)",
 		[]*Value{
-			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			myVal,
+			myVal,
+			myVal,
 		},
-		&Content{Key: "Winnie", Value: "Poop", Timestamp: 1},
+		myVal.C,
 		true,
 	},
 	{
 		"quorum (II)",
 		[]*Value{
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
-			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
+			myVal2,
+			myVal,
+			myVal,
 		},
-		&Content{Key: "Winnie", Value: "Poo", Timestamp: 2},
+		myVal2.C,
 		true,
 	},
 	{
 		"quorum (III)",
 		[]*Value{
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
-			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			{C: &Content{Key: "Winnie", Value: "Pooop", Timestamp: 3}},
+			myVal2,
+			myVal,
+			myVal3,
 		},
-		&Content{Key: "Winnie", Value: "Pooop", Timestamp: 3},
+		myVal3.C,
 		true,
 	},
 	{
 		"quorum (IV)",
 		[]*Value{
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 2}},
-			{C: &Content{Key: "Winnie", Value: "Poop", Timestamp: 1}},
-			{C: &Content{Key: "Winnie", Value: "Pooop", Timestamp: 3}},
-			{C: &Content{Key: "Winnie", Value: "Poooop", Timestamp: 4}},
+			myVal2,
+			myVal,
+			myVal3,
+			myVal4,
 		},
-		&Content{Key: "Winnie", Value: "Poooop", Timestamp: 4},
+		myVal4.C,
 		true,
 	},
 	{
@@ -167,40 +169,7 @@ var authReadQFTests = []struct {
 			myVal,
 			myVal,
 		},
-		myContent,
-		true,
-	},
-	{
-		"quorum (VI)",
-		[]*Value{
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			myVal,
-			myVal,
-			myVal,
-		},
-		myContent,
-		true,
-	},
-	{
-		"quorum (VII)",
-		[]*Value{
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			myVal,
-			myVal,
-		},
-		myContent,
-		true,
-	},
-	{
-		"quorum (VIII)",
-		[]*Value{
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			{C: &Content{Key: "Winnie", Value: "Poo", Timestamp: 1}},
-			myVal,
-		},
-		myContent,
+		myVal.C,
 		true,
 	},
 	{
@@ -210,7 +179,7 @@ var authReadQFTests = []struct {
 			myVal,
 			myVal,
 		},
-		myContent,
+		myVal.C,
 		true,
 	},
 	{
@@ -221,7 +190,7 @@ var authReadQFTests = []struct {
 			myVal,
 			myVal,
 		},
-		myContent,
+		myVal.C,
 		true,
 	},
 }
