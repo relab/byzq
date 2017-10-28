@@ -239,84 +239,34 @@ func TestAuthDataQ(t *testing.T) {
 			}
 		}
 
-		t.Run(fmt.Sprintf("(NoSignVerification)ReadQF(4,1) %s", test.name), func(t *testing.T) {
-			reply, byzquorum := qspec.ReadQF(test.replies)
-			if byzquorum != test.rq {
-				t.Errorf("got %t, want %t", byzquorum, test.rq)
-			}
-			if reply != nil {
-				if !reply.Equal(test.expected) {
-					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
-				}
-			} else {
-				if test.expected != nil {
-					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
-				}
-			}
-		})
+		qfuncs := []struct {
+			name string
+			qf   func([]*Value) (*Content, bool)
+		}{
+			{"(NoSignVerification)ReadQF(4,1)", qspec.ReadQF},
+			{"SequentialVerifyReadQFReadQF(4,1)", qspec.SequentialVerifyReadQF},
+			{"ConcurrentVerifyIndexChanReadQF(4,1)", qspec.ConcurrentVerifyIndexChanReadQF},
+			{"VerfiyLastReplyFirstReadQF(4,1)", qspec.VerfiyLastReplyFirstReadQF},
+			{"ConcurrentVerifyWGReadQF(4,1)", qspec.ConcurrentVerifyWGReadQF},
+		}
 
-		t.Run(fmt.Sprintf("SequentialVerifyReadQFReadQF(4,1) %s", test.name), func(t *testing.T) {
-			reply, byzquorum := qspec.SequentialVerifyReadQF(test.replies)
-			if byzquorum != test.rq {
-				t.Errorf("got %t, want %t", byzquorum, test.rq)
-			}
-			if reply != nil {
-				if !reply.Equal(test.expected) {
-					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+		for _, qfunc := range qfuncs {
+			t.Run(fmt.Sprintf("%s %s", qfunc.name, test.name), func(t *testing.T) {
+				reply, byzquorum := qfunc.qf(test.replies)
+				if byzquorum != test.rq {
+					t.Errorf("got %t, want %t", byzquorum, test.rq)
 				}
-			} else {
-				if test.expected != nil {
-					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+				if reply != nil {
+					if !reply.Equal(test.expected) {
+						t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+					}
+				} else {
+					if test.expected != nil {
+						t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
+					}
 				}
-			}
-		})
-
-		t.Run(fmt.Sprintf("ConcurrentVerifyIndexChanReadQF(4,1) %s", test.name), func(t *testing.T) {
-			reply, byzquorum := qspec.ConcurrentVerifyIndexChanReadQF(test.replies)
-			if byzquorum != test.rq {
-				t.Errorf("got %t, want %t", byzquorum, test.rq)
-			}
-			if reply != nil {
-				if !reply.Equal(test.expected) {
-					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
-				}
-			} else {
-				if test.expected != nil {
-					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
-				}
-			}
-		})
-		t.Run(fmt.Sprintf("VerfiyLastReplyFirstReadQF(4,1) %s", test.name), func(t *testing.T) {
-			reply, byzquorum := qspec.VerfiyLastReplyFirstReadQF(test.replies)
-			if byzquorum != test.rq {
-				t.Errorf("got %t, want %t", byzquorum, test.rq)
-			}
-			if reply != nil {
-				if !reply.Equal(test.expected) {
-					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
-				}
-			} else {
-				if test.expected != nil {
-					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
-				}
-			}
-		})
-
-		t.Run(fmt.Sprintf("ConcurrentVerifyWGReadQF(4,1) %s", test.name), func(t *testing.T) {
-			reply, byzquorum := qspec.ConcurrentVerifyWGReadQF(test.replies)
-			if byzquorum != test.rq {
-				t.Errorf("got %t, want %t", byzquorum, test.rq)
-			}
-			if reply != nil {
-				if !reply.Equal(test.expected) {
-					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
-				}
-			} else {
-				if test.expected != nil {
-					t.Errorf("got %v, want %v as quorum reply", reply, test.expected)
-				}
-			}
-		})
+			})
+		}
 	}
 }
 
