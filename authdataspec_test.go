@@ -286,44 +286,26 @@ func BenchmarkAuthDataQ(b *testing.B) {
 			}
 		}
 
-		b.Run(fmt.Sprintf("(NoSignVerification)ReadQF(4,1) %s", test.name), func(b *testing.B) {
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				qspec.ReadQF(test.replies)
-			}
-		})
+		qfuncs := []struct {
+			name string
+			qf   func([]*Value) (*Content, bool)
+		}{
+			{"(NoSignVerification)ReadQF(4,1)", qspec.ReadQF},
+			{"SequentialVerifyReadQFReadQF(4,1)", qspec.SequentialVerifyReadQF},
+			{"ConcurrentVerifyIndexChanReadQF(4,1)", qspec.ConcurrentVerifyIndexChanReadQF},
+			{"VerfiyLastReplyFirstReadQF(4,1)", qspec.VerfiyLastReplyFirstReadQF},
+			{"ConcurrentVerifyWGReadQF(4,1)", qspec.ConcurrentVerifyWGReadQF},
+		}
 
-		b.Run(fmt.Sprintf("SequentialVerifyReadQF(4,1) %s", test.name), func(b *testing.B) {
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				qspec.SequentialVerifyReadQF(test.replies)
-			}
-		})
-
-		b.Run(fmt.Sprintf("ConcurrentVerifyIndexChanReadQF(4,1) %s", test.name), func(b *testing.B) {
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				qspec.ConcurrentVerifyIndexChanReadQF(test.replies)
-			}
-		})
-		b.Run(fmt.Sprintf("VerfiyLastReplyFirstReadQF(4,1) %s", test.name), func(b *testing.B) {
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				qspec.VerfiyLastReplyFirstReadQF(test.replies)
-			}
-		})
-
-		b.Run(fmt.Sprintf("ConcurrentVerifyWGReadQF(4,1) %s", test.name), func(b *testing.B) {
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				qspec.ConcurrentVerifyWGReadQF(test.replies)
-			}
-		})
+		for _, qfunc := range qfuncs {
+			b.Run(fmt.Sprintf("%s %s", qfunc.name, test.name), func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					qfunc.qf(test.replies)
+				}
+			})
+		}
 	}
 }
 
