@@ -104,3 +104,12 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 
 	properties.TestingRun(t)
 }
+
+// func QuorumRange(n, lower, upper int) gopter.Gen {
+// 	qspec, err := NewAuthDataQ(n, priv, &priv.PublicKey)
+// 	if err != nil {
+// 		return gen.Fail(nil)
+// 	}
+// 	numReplies, _ := gen.IntRange(qspec.q+1, qspec.n).Sample()
+
+// }
