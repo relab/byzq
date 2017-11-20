@@ -1,7 +1,8 @@
 package byzq
 
 import (
-	math "math"
+	"math"
+	"reflect"
 	"testing"
 
 	"github.com/leanovate/gopter"
@@ -88,7 +89,7 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 					t.Fatal("failed to sign message")
 				}
 			}
-			reply, byzquorum := qspec.ReadQF(replies)
+			reply, byzquorum := qspec.ConcurrentVerifyWGReadQF(replies)
 			if !byzquorum {
 				return false
 			}
@@ -102,14 +103,55 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 		gen.IntRange(4, 200),
 	))
 
+	type qfParams struct {
+		quorumSize int
+		qspec      *AuthDataQ
+	}
+
+	properties.Property("testing -- sufficient replies guarantees a quorum", prop.ForAll(
+		func(params *qfParams) bool {
+			sliceGen := gen.SliceOfN(params.quorumSize, gen.Const(myVal))
+			result := sliceGen(gopter.DefaultGenParameters())
+			value, ok := result.Retrieve()
+			if !ok || value == nil {
+				t.Errorf("invalid value: %#v", value)
+				return false
+			}
+			replies, ok := value.([]*Value)
+			if !ok || len(replies) != params.quorumSize {
+				t.Errorf("invalid number of replies: %d, expected: %d", len(replies), params.quorumSize)
+				return false
+			}
+			var err error
+			for i, r := range replies {
+				replies[i], err = params.qspec.Sign(r.C)
+				if err != nil {
+					t.Fatal("failed to sign message")
+				}
+			}
+			reply, byzquorum := params.qspec.SequentialVerifyReadQF(replies)
+			if !byzquorum {
+				return false
+			}
+			for _, r := range replies {
+				if reply.Equal(r.GetC()) {
+					return true
+				}
+			}
+			return false
+		},
+		gen.IntRange(4, 100).FlatMap(func(n interface{}) gopter.Gen {
+			qspec, err := NewAuthDataQ(n.(int), priv, &priv.PublicKey)
+			if err != nil {
+				t.Fatalf("failed to create quorum specification for size %d", n)
+			}
+			return gen.IntRange(qspec.q+1, qspec.n).Map(func(quorumSize interface{}) gopter.Gen {
+				return func(*gopter.GenParameters) *gopter.GenResult {
+					return gopter.NewGenResult(&qfParams{quorumSize.(int), qspec}, gopter.NoShrinker)
+				}
+			})
+		}, reflect.TypeOf(&qfParams{})),
+	))
+
 	properties.TestingRun(t)
 }
-
-// func QuorumRange(n, lower, upper int) gopter.Gen {
-// 	qspec, err := NewAuthDataQ(n, priv, &priv.PublicKey)
-// 	if err != nil {
-// 		return gen.Fail(nil)
-// 	}
-// 	numReplies, _ := gen.IntRange(qspec.q+1, qspec.n).Sample()
-
-// }
