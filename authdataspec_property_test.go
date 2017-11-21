@@ -35,6 +35,11 @@ func TestAuthDataQSpecProperties(t *testing.T) {
 func TestAuthDataQuorumProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
+	type qfParams struct {
+		quorumSize int
+		qspec      *AuthDataQ
+	}
+
 	replyGen := func(numReplies int) []*Value {
 		sliceGen := gen.SliceOfN(numReplies, gen.Const(myVal))
 		result := sliceGen(gopter.DefaultGenParameters())
@@ -47,6 +52,11 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 			t.Fatalf("invalid number of replies: %d, expected: %d", len(replies), numReplies)
 		}
 		return replies
+	}
+	quorumRangeGen := func(min, max int, qspec *AuthDataQ) gopter.Gen {
+		return gen.IntRange(qspec.q+1, qspec.n).Map(func(quorumSize interface{}) *qfParams {
+			return &qfParams{quorumSize.(int), qspec}
+		})
 	}
 
 	properties.Property("no quorum unless enough replies", prop.ForAll(
@@ -65,42 +75,6 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 		},
 		gen.IntRange(4, 200),
 	))
-
-	properties.Property("sufficient replies guarantees a quorum", prop.ForAll(
-		func(n int) bool {
-			qspec, err := NewAuthDataQ(n, priv, &priv.PublicKey)
-			if err != nil {
-				return false
-			}
-			numReplies, ok := gen.IntRange(qspec.q+1, qspec.n).Sample()
-			if !ok {
-				return false
-			}
-			replies := replyGen(numReplies.(int))
-			for i, r := range replies {
-				replies[i], err = qspec.Sign(r.C)
-				if err != nil {
-					t.Fatal("failed to sign message")
-				}
-			}
-			reply, byzquorum := qspec.ConcurrentVerifyWGReadQF(replies)
-			if !byzquorum {
-				return false
-			}
-			for _, r := range replies {
-				if reply.Equal(r.GetC()) {
-					return true
-				}
-			}
-			return false
-		},
-		gen.IntRange(4, 200),
-	))
-
-	type qfParams struct {
-		quorumSize int
-		qspec      *AuthDataQ
-	}
 
 	properties.Property("sufficient replies guarantees a quorum", prop.ForAll(
 		func(params *qfParams) bool {
@@ -123,14 +97,12 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 			}
 			return false
 		},
-		gen.IntRange(4, 100).FlatMap(func(n interface{}) gopter.Gen {
+		gen.IntRange(4, 200).FlatMap(func(n interface{}) gopter.Gen {
 			qspec, err := NewAuthDataQ(n.(int), priv, &priv.PublicKey)
 			if err != nil {
 				t.Fatalf("failed to create quorum specification for size %d", n)
 			}
-			return gen.IntRange(qspec.q+1, qspec.n).Map(func(quorumSize interface{}) *qfParams {
-				return &qfParams{quorumSize.(int), qspec}
-			})
+			return quorumRangeGen(qspec.q+1, qspec.n, qspec)
 		}, reflect.TypeOf(&qfParams{})),
 	))
 
