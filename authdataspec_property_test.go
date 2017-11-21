@@ -54,26 +54,24 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 		return replies
 	}
 	quorumRangeGen := func(min, max int, qspec *AuthDataQ) gopter.Gen {
-		return gen.IntRange(qspec.q+1, qspec.n).Map(func(quorumSize interface{}) *qfParams {
+		return gen.IntRange(min, max).Map(func(quorumSize interface{}) *qfParams {
 			return &qfParams{quorumSize.(int), qspec}
 		})
 	}
 
 	properties.Property("no quorum unless enough replies", prop.ForAll(
-		func(n int) bool {
-			qspec, err := NewAuthDataQ(n, priv, &priv.PublicKey)
-			if err != nil {
-				return false
-			}
-			nonQuormSize, ok := gen.IntRange(0, qspec.q).Sample()
-			if !ok {
-				return false
-			}
-			replies := replyGen(nonQuormSize.(int))
-			reply, byzquorum := qspec.ReadQF(replies)
+		func(params *qfParams) bool {
+			replies := replyGen(params.quorumSize)
+			reply, byzquorum := params.qspec.ReadQF(replies)
 			return !byzquorum && reply == nil
 		},
-		gen.IntRange(4, 200),
+		gen.IntRange(4, 200).FlatMap(func(n interface{}) gopter.Gen {
+			qspec, err := NewAuthDataQ(n.(int), priv, &priv.PublicKey)
+			if err != nil {
+				t.Fatalf("failed to create quorum specification for size %d", n)
+			}
+			return quorumRangeGen(0, qspec.q, qspec)
+		}, reflect.TypeOf(&qfParams{})),
 	))
 
 	properties.Property("sufficient replies guarantees a quorum", prop.ForAll(
