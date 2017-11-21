@@ -35,6 +35,20 @@ func TestAuthDataQSpecProperties(t *testing.T) {
 func TestAuthDataQuorumProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
+	replyGen := func(numReplies int) []*Value {
+		sliceGen := gen.SliceOfN(numReplies, gen.Const(myVal))
+		result := sliceGen(gopter.DefaultGenParameters())
+		value, ok := result.Retrieve()
+		if !ok || value == nil {
+			t.Fatalf("invalid value: %#v", value)
+		}
+		replies, ok := value.([]*Value)
+		if !ok || len(replies) != numReplies {
+			t.Fatalf("invalid number of replies: %d, expected: %d", len(replies), numReplies)
+		}
+		return replies
+	}
+
 	properties.Property("no quorum unless enough replies", prop.ForAll(
 		func(n int) bool {
 			qspec, err := NewAuthDataQ(n, priv, &priv.PublicKey)
@@ -45,16 +59,7 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 			if !ok {
 				return false
 			}
-			sliceGen := gen.SliceOfN(nonQuormSize.(int), gen.Const(myVal))
-			result := sliceGen(gopter.DefaultGenParameters())
-			value, ok := result.Retrieve()
-			if !ok || value == nil {
-				return false
-			}
-			replies, ok := value.([]*Value)
-			if !ok || len(replies) != nonQuormSize {
-				return false
-			}
+			replies := replyGen(nonQuormSize.(int))
 			reply, byzquorum := qspec.ReadQF(replies)
 			return !byzquorum && reply == nil
 		},
@@ -71,18 +76,7 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 			if !ok {
 				return false
 			}
-			sliceGen := gen.SliceOfN(numReplies.(int), gen.Const(myVal))
-			result := sliceGen(gopter.DefaultGenParameters())
-			value, ok := result.Retrieve()
-			if !ok || value == nil {
-				t.Errorf("invalid value: %#v", value)
-				return false
-			}
-			replies, ok := value.([]*Value)
-			if !ok || len(replies) != numReplies {
-				t.Errorf("invalid value: %#v", value)
-				return false
-			}
+			replies := replyGen(numReplies.(int))
 			for i, r := range replies {
 				replies[i], err = qspec.Sign(r.C)
 				if err != nil {
@@ -110,18 +104,7 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 
 	properties.Property("testing -- sufficient replies guarantees a quorum", prop.ForAll(
 		func(params *qfParams) bool {
-			sliceGen := gen.SliceOfN(params.quorumSize, gen.Const(myVal))
-			result := sliceGen(gopter.DefaultGenParameters())
-			value, ok := result.Retrieve()
-			if !ok || value == nil {
-				t.Errorf("invalid value: %#v", value)
-				return false
-			}
-			replies, ok := value.([]*Value)
-			if !ok || len(replies) != params.quorumSize {
-				t.Errorf("invalid number of replies: %d, expected: %d", len(replies), params.quorumSize)
-				return false
-			}
+			replies := replyGen(params.quorumSize)
 			var err error
 			for i, r := range replies {
 				replies[i], err = params.qspec.Sign(r.C)
