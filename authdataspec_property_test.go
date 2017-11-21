@@ -102,7 +102,7 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 		qspec      *AuthDataQ
 	}
 
-	properties.Property("testing -- sufficient replies guarantees a quorum", prop.ForAll(
+	properties.Property("sufficient replies guarantees a quorum", prop.ForAll(
 		func(params *qfParams) bool {
 			replies := replyGen(params.quorumSize)
 			var err error
@@ -128,10 +128,8 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create quorum specification for size %d", n)
 			}
-			return gen.IntRange(qspec.q+1, qspec.n).Map(func(quorumSize interface{}) gopter.Gen {
-				return func(*gopter.GenParameters) *gopter.GenResult {
-					return gopter.NewGenResult(&qfParams{quorumSize.(int), qspec}, gopter.NoShrinker)
-				}
+			return gen.IntRange(qspec.q+1, qspec.n).Map(func(quorumSize interface{}) *qfParams {
+				return &qfParams{quorumSize.(int), qspec}
 			})
 		}, reflect.TypeOf(&qfParams{})),
 	))
