@@ -13,8 +13,6 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-// TODO(meling): Make tests for f=2 and f=3.
-
 var priv *ecdsa.PrivateKey
 
 var pemKeyData = `-----BEGIN EC PRIVATE KEY-----

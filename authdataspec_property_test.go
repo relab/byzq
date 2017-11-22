@@ -53,6 +53,7 @@ func TestAuthDataQuorumProperties(t *testing.T) {
 		}
 		return replies
 	}
+
 	quorumRangeGen := func(min, max int, qspec *AuthDataQ) gopter.Gen {
 		return gen.IntRange(min, max).Map(func(quorumSize interface{}) *qfParams {
 			return &qfParams{quorumSize.(int), qspec}
